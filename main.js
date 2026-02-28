@@ -1,77 +1,755 @@
-document.addEventListener("DOMContentLoaded", () => {
-    const circlesContainer = document.getElementById("circles-container");
-    if (circlesContainer) {
-        const circleCount = 12;
-        for (let i = 0; i < circleCount; i++) {
-            const circle = document.createElement("div");
-            circle.className = "circle";
-            const size = 120 + Math.random() * 260;
-            const duration = 22 + Math.random() * 14;
-            const delay = Math.random() * -duration;
-            circle.style.width = `${size}px`;
-            circle.style.height = `${size}px`;
-            circle.style.left = `${Math.random() * 100}%`;
-            circle.style.top = `${Math.random() * 100}%`;
-            circle.style.animationDuration = `${duration}s`;
-            circle.style.animationDelay = `${delay}s`;
-            circlesContainer.appendChild(circle);
+(function () {
+    "use strict";
+
+    var STORAGE_USER = "yescoursesUser";
+    var STORAGE_ACCOUNTS = "yescoursesAccounts";
+    var STORAGE_CURRENT_USER_EMAIL = "yescoursesCurrentUserEmail";
+    var STORAGE_ADMIN = "yescoursesAdmin";
+    var STORAGE_VIDEOS = "yescoursesVideos";
+    var DB_NAME = "yescoursesData";
+    var DB_VERSION = 1;
+    var BLOB_STORE = "videoBlobs";
+
+    function readJSON(key, fallback) {
+        try {
+            var raw = localStorage.getItem(key);
+            return raw ? JSON.parse(raw) : fallback;
+        } catch (e) {
+            return fallback;
         }
     }
 
-    const faqItems = document.querySelectorAll(".faq-item");
-    faqItems.forEach((item) => {
-        const btn = item.querySelector(".faq-question");
-        btn.addEventListener("click", () => {
-            const isOpen = item.classList.contains("open");
-            faqItems.forEach((i) => i.classList.remove("open"));
-            if (!isOpen) item.classList.add("open");
-        });
-    });
-
-    const authModal = document.getElementById("auth-modal");
-    const openAuth = document.getElementById("open-auth-modal");
-    const closeAuth = document.getElementById("close-auth-modal");
-    const heroStartBtn = document.getElementById("hero-start-btn");
-
-    function showModal() {
-        if (authModal) authModal.classList.remove("hidden");
+    function writeJSON(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
     }
 
-    function hideModal() {
-        if (authModal) authModal.classList.add("hidden");
+    function getAccounts() {
+        var accounts = readJSON(STORAGE_ACCOUNTS, []);
+        return Array.isArray(accounts) ? accounts : [];
     }
 
-    if (openAuth) openAuth.addEventListener("click", showModal);
-    if (heroStartBtn) heroStartBtn.addEventListener("click", showModal);
-    if (closeAuth) closeAuth.addEventListener("click", hideModal);
-    if (authModal) {
-        authModal.addEventListener("click", (e) => {
-            if (e.target === authModal) hideModal();
+    function setAccounts(accounts) {
+        writeJSON(STORAGE_ACCOUNTS, accounts || []);
+    }
+
+    function getCurrentUserEmail() {
+        return localStorage.getItem(STORAGE_CURRENT_USER_EMAIL) || "";
+    }
+
+    function setCurrentUserEmail(email) {
+        if (!email) {
+            localStorage.removeItem(STORAGE_CURRENT_USER_EMAIL);
+            return;
+        }
+        localStorage.setItem(STORAGE_CURRENT_USER_EMAIL, email);
+    }
+
+    function getCurrentAccount() {
+        var email = getCurrentUserEmail();
+        if (!email) return null;
+        var accounts = getAccounts();
+        return accounts.find(function (a) { return a.email === email; }) || null;
+    }
+
+    function saveAccount(updatedAccount) {
+        var accounts = getAccounts();
+        var idx = accounts.findIndex(function (a) { return a.email === updatedAccount.email; });
+        if (idx >= 0) {
+            accounts[idx] = updatedAccount;
+        } else {
+            accounts.push(updatedAccount);
+        }
+        setAccounts(accounts);
+    }
+
+    function userHasPack(account, packId) {
+        return Boolean(
+            account &&
+            Array.isArray(account.purchased) &&
+            account.purchased.indexOf(packId) !== -1
+        );
+    }
+
+    function purchasePack(packId) {
+        var account = getCurrentAccount();
+        if (!account) return false;
+        if (!Array.isArray(account.purchased)) account.purchased = [];
+        if (account.purchased.indexOf(packId) === -1) {
+            account.purchased.push(packId);
+            saveAccount(account);
+        }
+        return true;
+    }
+
+    function ensureLegacyUserMigrated() {
+        var legacy = readJSON(STORAGE_USER, null);
+        var currentEmail = getCurrentUserEmail();
+        if (!legacy || currentEmail) return;
+        if (!legacy.email) return;
+
+        var accounts = getAccounts();
+        var exists = accounts.some(function (a) { return a.email === legacy.email; });
+        if (!exists) {
+            accounts.push({
+                name: legacy.name || "მომხმარებელი",
+                email: legacy.email,
+                password: "",
+                purchased: []
+            });
+            setAccounts(accounts);
+        }
+        setCurrentUserEmail(legacy.email);
+    }
+
+    function getVideos() {
+        var videos = readJSON(STORAGE_VIDEOS, []);
+        return Array.isArray(videos) ? videos : [];
+    }
+
+    function setVideos(videos) {
+        writeJSON(STORAGE_VIDEOS, videos || []);
+    }
+
+    function openVideoDb() {
+        return new Promise(function (resolve, reject) {
+            if (!window.indexedDB) {
+                reject(new Error("IndexedDB is not available"));
+                return;
+            }
+            var req = indexedDB.open(DB_NAME, DB_VERSION);
+            req.onupgradeneeded = function (event) {
+                var db = event.target.result;
+                if (!db.objectStoreNames.contains(BLOB_STORE)) {
+                    db.createObjectStore(BLOB_STORE);
+                }
+            };
+            req.onsuccess = function () { resolve(req.result); };
+            req.onerror = function () { reject(req.error); };
         });
     }
 
-    const tabButtons = document.querySelectorAll(".tab-button");
-    const tabPanels = document.querySelectorAll(".tab-panel");
-    tabButtons.forEach((btn) => {
-        btn.addEventListener("click", () => {
-            const target = btn.dataset.tab;
-            tabButtons.forEach((b) => b.classList.remove("active"));
-            tabPanels.forEach((p) => p.classList.remove("active"));
-            btn.classList.add("active");
-            const panel = document.getElementById(target);
-            if (panel) panel.classList.add("active");
+    function saveVideoBlob(blobId, file) {
+        return openVideoDb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(BLOB_STORE, "readwrite");
+                tx.objectStore(BLOB_STORE).put(file, blobId);
+                tx.oncomplete = function () { db.close(); resolve(); };
+                tx.onerror = function () { db.close(); reject(tx.error); };
+            });
         });
-    });
+    }
 
-    const chooseButtons = document.querySelectorAll(".choose-pack");
-    chooseButtons.forEach((btn) => {
-        btn.addEventListener("click", (e) => {
-            const loggedIn = document.querySelector(".user-name") !== null;
-            if (!loggedIn) {
-                e.preventDefault();
-                showModal();
+    function getVideoBlob(blobId) {
+        return openVideoDb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(BLOB_STORE, "readonly");
+                var req = tx.objectStore(BLOB_STORE).get(blobId);
+                req.onsuccess = function () { db.close(); resolve(req.result || null); };
+                req.onerror = function () { db.close(); reject(req.error); };
+            });
+        });
+    }
+
+    function deleteVideoBlob(blobId) {
+        if (!blobId) return Promise.resolve();
+        return openVideoDb().then(function (db) {
+            return new Promise(function (resolve, reject) {
+                var tx = db.transaction(BLOB_STORE, "readwrite");
+                tx.objectStore(BLOB_STORE).delete(blobId);
+                tx.oncomplete = function () { db.close(); resolve(); };
+                tx.onerror = function () { db.close(); reject(tx.error); };
+            });
+        });
+    }
+
+    window.YescoursesStore = {
+        getVideos: getVideos,
+        setVideos: setVideos,
+        saveVideoBlob: saveVideoBlob,
+        getVideoBlob: getVideoBlob,
+        deleteVideoBlob: deleteVideoBlob
+    };
+
+    function initBackground() {
+        var c = document.getElementById("circles-container");
+        if (!c) return;
+        var dots = [];
+        var n = 18;
+        for (var i = 0; i < n; i++) {
+            var d = document.createElement("div");
+            d.className = "circle";
+            var dur = 22 + Math.random() * 16;
+            var del = Math.random() * -dur;
+            var left = Math.random() * 100;
+            var top = Math.random() * 100;
+            d.style.left = left + "%";
+            d.style.top = top + "%";
+            d.style.animationDuration = dur + "s";
+            d.style.animationDelay = del + "s";
+            c.appendChild(d);
+            dots.push({ left: left, top: top });
+        }
+        for (var j = 1; j < dots.length; j++) {
+            var a = dots[j - 1];
+            var b = dots[j];
+            var line = document.createElement("div");
+            line.className = "circle-line";
+            var dx = b.left - a.left;
+            var dy = b.top - a.top;
+            var len = Math.sqrt(dx * dx + dy * dy);
+            var angle = Math.atan2(dy, dx) * 180 / Math.PI;
+            line.style.width = len + "vw";
+            line.style.left = a.left + "%";
+            line.style.top = a.top + "%";
+            line.style.transformOrigin = "0 0";
+            line.style.transform = "rotate(" + angle + "deg)";
+            c.appendChild(line);
+        }
+    }
+
+    function initFaq() {
+        var faqItems = document.querySelectorAll(".faq-item");
+        faqItems.forEach(function (item) {
+            var btn = item.querySelector(".faq-question");
+            if (!btn) return;
+            btn.addEventListener("click", function () {
+                var isOpen = item.classList.contains("open");
+                faqItems.forEach(function (i) { i.classList.remove("open"); });
+                if (!isOpen) item.classList.add("open");
+            });
+        });
+    }
+
+    function initAuthModal() {
+        var authModal = document.getElementById("auth-modal");
+        if (!authModal) return;
+
+        var openAuth = document.getElementById("open-auth-modal");
+        var closeAuth = document.getElementById("close-auth-modal");
+        var heroStartBtn = document.getElementById("hero-start-btn");
+        var logoutBtn = document.getElementById("logout-btn");
+        var profileWrap = document.getElementById("profile-menu-wrap");
+        var profileBtn = document.getElementById("profile-avatar-btn");
+        var profileInitial = document.getElementById("profile-avatar-initial");
+        var profileDropdown = document.getElementById("profile-dropdown");
+        var profileName = document.getElementById("profile-dropdown-name");
+        var profileEmail = document.getElementById("profile-dropdown-email");
+        var openSettingsBtn = document.getElementById("open-settings-modal");
+        var settingsModal = document.getElementById("settings-modal");
+        var closeSettingsBtn = document.getElementById("close-settings-modal");
+        var settingsUsername = document.getElementById("settings-username");
+        var settingsEmail = document.getElementById("settings-email");
+        var settingsMessage = document.getElementById("settings-message");
+        var changePasswordForm = document.getElementById("change-password-form");
+        var message = document.getElementById("auth-message");
+        var registerForm = document.getElementById("register-form");
+        var loginForm = document.getElementById("login-form");
+
+        function showModal() { authModal.classList.remove("hidden"); }
+        function hideModal() { authModal.classList.add("hidden"); }
+        function hideProfileDropdown() {
+            if (profileDropdown) profileDropdown.classList.add("hidden");
+        }
+
+        function paintUser() {
+            var account = getCurrentAccount();
+            if (account && account.name) {
+                if (profileWrap) profileWrap.style.display = "inline-block";
+                if (profileInitial) {
+                    profileInitial.textContent = (account.name || "U").trim().charAt(0).toUpperCase();
+                }
+                if (profileName) profileName.textContent = account.name;
+                if (profileEmail) profileEmail.textContent = account.email || "";
+                if (settingsUsername) settingsUsername.textContent = account.name;
+                if (settingsEmail) settingsEmail.textContent = account.email || "";
+                if (openAuth) openAuth.style.display = "none";
+                if (logoutBtn) logoutBtn.style.display = "inline-flex";
+            } else {
+                if (profileWrap) profileWrap.style.display = "none";
+                if (openAuth) openAuth.style.display = "inline-flex";
+                if (logoutBtn) logoutBtn.style.display = "none";
+                hideProfileDropdown();
+            }
+        }
+
+        function setMessage(text, type) {
+            if (!message) return;
+            message.textContent = text;
+            message.className = "auth-message " + (type || "");
+        }
+
+        if (openAuth) openAuth.addEventListener("click", showModal);
+        if (heroStartBtn) heroStartBtn.addEventListener("click", showModal);
+        if (closeAuth) closeAuth.addEventListener("click", hideModal);
+        if (logoutBtn) {
+            logoutBtn.addEventListener("click", function () {
+                localStorage.removeItem(STORAGE_USER);
+                setCurrentUserEmail("");
+                paintUser();
+                initPricingActions();
+                hideProfileDropdown();
+            });
+        }
+
+        if (profileBtn) {
+            profileBtn.addEventListener("click", function (e) {
+                e.stopPropagation();
+                if (profileDropdown) profileDropdown.classList.toggle("hidden");
+            });
+        }
+
+        document.addEventListener("click", function (e) {
+            if (!profileWrap || !profileDropdown) return;
+            if (!profileWrap.contains(e.target)) {
+                profileDropdown.classList.add("hidden");
             }
         });
-    });
-});
+
+        function showSettingsModal() {
+            if (settingsMessage) settingsMessage.textContent = "";
+            if (settingsModal) settingsModal.classList.remove("hidden");
+            hideProfileDropdown();
+        }
+
+        function hideSettingsModal() {
+            if (settingsModal) settingsModal.classList.add("hidden");
+        }
+
+        if (openSettingsBtn) {
+            openSettingsBtn.addEventListener("click", showSettingsModal);
+        }
+        if (closeSettingsBtn) {
+            closeSettingsBtn.addEventListener("click", hideSettingsModal);
+        }
+        if (settingsModal) {
+            settingsModal.addEventListener("click", function (e) {
+                if (e.target === settingsModal) hideSettingsModal();
+            });
+        }
+
+        if (changePasswordForm) {
+            changePasswordForm.addEventListener("submit", function (e) {
+                e.preventDefault();
+                var account = getCurrentAccount();
+                if (!account) return;
+                var data = new FormData(changePasswordForm);
+                var newPassword = (data.get("new_password") || "").toString();
+                if (newPassword.length < 6) {
+                    if (settingsMessage) {
+                        settingsMessage.className = "auth-message error";
+                        settingsMessage.textContent = "პაროლი მინიმუმ 6 სიმბოლო.";
+                    }
+                    return;
+                }
+                account.password = newPassword;
+                saveAccount(account);
+                if (settingsMessage) {
+                    settingsMessage.className = "auth-message success";
+                    settingsMessage.textContent = "პაროლი წარმატებით განახლდა.";
+                }
+                changePasswordForm.reset();
+            });
+        }
+
+        authModal.addEventListener("click", function (e) {
+            if (e.target === authModal) hideModal();
+        });
+
+        var tabButtons = document.querySelectorAll(".tab-button");
+        var tabPanels = document.querySelectorAll(".tab-panel");
+        tabButtons.forEach(function (btn) {
+            btn.addEventListener("click", function () {
+                var target = btn.dataset.tab;
+                tabButtons.forEach(function (b) { b.classList.remove("active"); });
+                tabPanels.forEach(function (p) { p.classList.remove("active"); });
+                btn.classList.add("active");
+                var panel = document.getElementById(target);
+                if (panel) panel.classList.add("active");
+            });
+        });
+
+        if (registerForm) {
+            registerForm.addEventListener("submit", function (e) {
+                e.preventDefault();
+                var data = new FormData(registerForm);
+                var name = (data.get("name") || "").toString().trim();
+                var email = (data.get("email") || "").toString().trim();
+                var password = (data.get("password") || "").toString();
+                if (!name || !email) {
+                    setMessage("შეავსე ყველა ველი.", "error");
+                    return;
+                }
+                if (password.length < 6) {
+                    setMessage("პაროლი მინიმუმ 6 სიმბოლო.", "error");
+                    return;
+                }
+
+                var accounts = getAccounts();
+                if (accounts.some(function (a) { return a.email === email; })) {
+                    setMessage("ეს ელფოსტა უკვე დარეგისტრირებულია.", "error");
+                    return;
+                }
+
+                var account = {
+                    name: name,
+                    email: email,
+                    password: password,
+                    purchased: []
+                };
+                accounts.push(account);
+                setAccounts(accounts);
+                setCurrentUserEmail(email);
+                writeJSON(STORAGE_USER, { name: name, email: email });
+                setMessage("რეგისტრაცია წარმატებულია.", "success");
+                paintUser();
+                initPricingActions();
+                setTimeout(hideModal, 500);
+            });
+        }
+
+        if (loginForm) {
+            loginForm.addEventListener("submit", function (e) {
+                e.preventDefault();
+                var data = new FormData(loginForm);
+                var email = (data.get("email") || "").toString().trim();
+                var password = (data.get("password") || "").toString();
+                if (!email) {
+                    setMessage("შეავსე ელფოსტა.", "error");
+                    return;
+                }
+                var accounts = getAccounts();
+                var account = accounts.find(function (a) {
+                    return a.email === email && a.password === password;
+                });
+                if (!account) {
+                    setMessage("არასწორი ელფოსტა ან პაროლი.", "error");
+                    return;
+                }
+                setCurrentUserEmail(account.email);
+                writeJSON(STORAGE_USER, { name: account.name || "მომხმარებელი", email: account.email });
+                setMessage("შესვლა წარმატებულია.", "success");
+                paintUser();
+                initPricingActions();
+                setTimeout(hideModal, 500);
+            });
+        }
+
+        function initPasswordToggles() {
+            document.querySelectorAll(".password-toggle").forEach(function (btn) {
+                if (btn.dataset.bound === "1") return;
+                btn.dataset.bound = "1";
+                btn.addEventListener("click", function () {
+                    var wrap = btn.closest(".password-field");
+                    if (!wrap) return;
+                    var input = wrap.querySelector("input");
+                    if (!input) return;
+                    var show = input.type === "password";
+                    input.type = show ? "text" : "password";
+                    btn.textContent = show ? "🙈" : "👁";
+                });
+            });
+        }
+
+        initPasswordToggles();
+        paintUser();
+    }
+
+    function initPricingActions() {
+        var actions = document.querySelectorAll(".pack-action");
+        if (!actions.length) return;
+
+        var account = getCurrentAccount();
+        actions.forEach(function (btn) {
+            var pack = btn.getAttribute("data-pack") || "basic";
+            var purchased = userHasPack(account, pack);
+            btn.textContent = purchased ? "კურსის გვერდი" : "ვიყიდო";
+            if (btn.dataset.bound === "1") return;
+            btn.dataset.bound = "1";
+            btn.addEventListener("click", function () {
+                var current = getCurrentAccount();
+                if (!current) {
+                    var openBtn = document.getElementById("open-auth-modal");
+                    if (openBtn) openBtn.click();
+                    return;
+                }
+
+                if (userHasPack(current, pack)) {
+                    window.location.href = "course.html?pack=" + encodeURIComponent(pack);
+                    return;
+                }
+
+                var ok = window.confirm("გადახდის ბმულს მოგვიანებით დავამატებთ. გინდა ეს პაკეტი ახლა ჩაითვალოს შეძენილად?");
+                if (!ok) return;
+                purchasePack(pack);
+                initPricingActions();
+                window.location.href = "course.html?pack=" + encodeURIComponent(pack);
+            });
+        });
+    }
+
+    function initCoursePage() {
+        var list = document.getElementById("videos-list");
+        if (!list) return;
+
+        var params = new URLSearchParams(window.location.search);
+        var pack = params.get("pack") || "basic";
+        var account = getCurrentAccount();
+        if (!account) {
+            window.location.href = "index.html";
+            return;
+        }
+        if (!userHasPack(account, pack)) {
+            alert("ამ კურსზე წვდომა არ გაქვს. ჯერ შეიძინე შესაბამისი პაკეტი.");
+            window.location.href = "index.html";
+            return;
+        }
+
+        var packNames = { basic: "Basic", plus: "Plus", pro: "Pro" };
+        var title = document.getElementById("course-title");
+        if (title) title.textContent = "შენი კურსის სივრცე — " + (packNames[pack] || "Basic");
+
+        var videos = getVideos();
+        var filtered = videos.filter(function (v) { return v.pack_id === pack; });
+        filtered.sort(function (a, b) {
+            return Number(a.order_index || 0) - Number(b.order_index || 0);
+        });
+
+        if (!filtered.length) {
+            list.innerHTML = '<article class="video-card"><div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div><p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p></article>';
+            return;
+        }
+
+        list.innerHTML = filtered.map(function (v, i) {
+            return [
+                '<article class="video-card">',
+                '<div class="video-header"><span class="video-order">#' + (i + 1) + '</span><h3 class="video-title">' + escapeHtml(v.title) + '</h3></div>',
+                v.description ? '<p class="video-description">' + escapeHtml(v.description) + '</p>' : "",
+                '<div class="video-player-wrapper"><video class="video-player" data-blob-id="' + escapeHtml(v.blob_id || "") + '" data-fallback-url="' + escapeHtml(v.url || "") + '" controls preload="metadata">თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>',
+                '</article>'
+            ].join("");
+        }).join("");
+
+        list.querySelectorAll(".video-player").forEach(function (video) {
+            var blobId = video.getAttribute("data-blob-id");
+            var fallbackUrl = video.getAttribute("data-fallback-url");
+            if (!blobId) {
+                if (fallbackUrl) video.src = fallbackUrl;
+                return;
+            }
+            getVideoBlob(blobId).then(function (blob) {
+                if (blob) {
+                    video.src = URL.createObjectURL(blob);
+                    return;
+                }
+                if (fallbackUrl) video.src = fallbackUrl;
+            }).catch(function () {
+                if (fallbackUrl) video.src = fallbackUrl;
+            });
+        });
+    }
+
+    function initAdminPage() {
+        var loginView = document.getElementById("admin-login-view");
+        var dashView = document.getElementById("admin-dashboard-view");
+        if (!loginView || !dashView) return;
+
+        var loginForm = document.getElementById("admin-login-form");
+        var message = document.getElementById("admin-auth-message");
+        var logoutBtn = document.getElementById("admin-logout-btn");
+        var list = document.getElementById("admin-videos-list");
+        var statBasic = document.getElementById("admin-stat-basic");
+        var statPlus = document.getElementById("admin-stat-plus");
+        var statPro = document.getElementById("admin-stat-pro");
+
+        function paintSalesStats() {
+            var accounts = getAccounts();
+            var basic = accounts.filter(function (a) { return userHasPack(a, "basic"); }).length;
+            var plus = accounts.filter(function (a) { return userHasPack(a, "plus"); }).length;
+            var pro = accounts.filter(function (a) { return userHasPack(a, "pro"); }).length;
+            if (statBasic) statBasic.textContent = basic + " გაყიდვა";
+            if (statPlus) statPlus.textContent = plus + " გაყიდვა";
+            if (statPro) statPro.textContent = pro + " გაყიდვა";
+        }
+
+        function normalizeVideoOrder() {
+            var videos = getVideos().slice().sort(function (a, b) {
+                return Number(a.order_index || 0) - Number(b.order_index || 0);
+            });
+            videos = videos.map(function (v, i) {
+                v.order_index = i + 1;
+                return v;
+            });
+            setVideos(videos);
+            return videos;
+        }
+
+        function moveVideo(id, direction) {
+            var videos = normalizeVideoOrder();
+            var index = videos.findIndex(function (v) { return v.id === id; });
+            if (index < 0) return;
+            var target = index + direction;
+            if (target < 0 || target >= videos.length) return;
+            var tmp = videos[index];
+            videos[index] = videos[target];
+            videos[target] = tmp;
+            videos = videos.map(function (v, i) {
+                v.order_index = i + 1;
+                return v;
+            });
+            setVideos(videos);
+            paintVideoList();
+        }
+
+        function paintVideoList() {
+            if (!list) return;
+            var videos = normalizeVideoOrder();
+            if (!videos.length) {
+                list.innerHTML = '<li style="padding:0.5rem 0;color:#9ca3af;">ვიდეოები ჯერ არ არის ატვირთული.</li>';
+                return;
+            }
+
+            list.innerHTML = videos.map(function (v, index) {
+                var id = escapeHtml(v.id);
+                var safeTitle = escapeHtml(v.title || "");
+                var safeDesc = escapeHtml(v.description || "");
+                var order = Number(v.order_index || index + 1);
+                return [
+                    '<li style="padding:0.8rem 0;border-bottom:1px solid rgba(148,163,184,0.2);" data-row-id="' + id + '">',
+                    '<div style="display:grid;grid-template-columns:2fr 1fr 100px;gap:0.6rem;margin-bottom:0.6rem;">',
+                    '<input type="text" class="admin-video-title" value="' + safeTitle + '" placeholder="სათაური">',
+                    '<select class="admin-video-pack"><option value="basic">Basic</option><option value="plus">Plus</option><option value="pro">Pro</option></select>',
+                    '<input type="number" class="admin-video-order" min="1" value="' + order + '">',
+                    '</div>',
+                    '<textarea class="admin-video-desc" rows="2" placeholder="აღწერა" style="width:100%;margin-bottom:0.6rem;">' + safeDesc + '</textarea>',
+                    '<div style="display:flex;gap:0.5rem;flex-wrap:wrap;">',
+                    '<button class="btn-primary admin-save-video" data-video-id="' + id + '">შენახვა</button>',
+                    '<button class="btn-outline admin-move-up" data-video-id="' + id + '">ზემოთ</button>',
+                    '<button class="btn-outline admin-move-down" data-video-id="' + id + '">ქვემოთ</button>',
+                    '<button class="btn-secondary admin-delete-video" data-video-id="' + id + '">წაშლა</button>',
+                    '</div>',
+                    '</li>'
+                ].join("");
+            }).join("");
+
+            list.querySelectorAll(".admin-video-pack").forEach(function (selectEl, idx) {
+                selectEl.value = videos[idx].pack_id || "basic";
+            });
+
+            list.querySelectorAll(".admin-save-video").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var id = btn.getAttribute("data-video-id");
+                    var row = list.querySelector('[data-row-id="' + id + '"]');
+                    if (!row) return;
+                    var titleEl = row.querySelector(".admin-video-title");
+                    var packEl = row.querySelector(".admin-video-pack");
+                    var orderEl = row.querySelector(".admin-video-order");
+                    var descEl = row.querySelector(".admin-video-desc");
+                    var current = getVideos();
+                    var updated = current.map(function (v) {
+                        if (v.id !== id) return v;
+                        return {
+                            id: v.id,
+                            title: (titleEl ? titleEl.value : v.title) || "ვიდეო",
+                            description: (descEl ? descEl.value : v.description) || "",
+                            pack_id: (packEl ? packEl.value : v.pack_id) || "basic",
+                            order_index: Math.max(1, Number(orderEl ? orderEl.value : v.order_index) || 1),
+                            blob_id: v.blob_id || "",
+                            url: v.url || ""
+                        };
+                    });
+                    setVideos(updated);
+                    paintVideoList();
+                });
+            });
+
+            list.querySelectorAll(".admin-delete-video").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    var id = btn.getAttribute("data-video-id");
+                    var current = getVideos();
+                    var toDelete = current.find(function (v) { return v.id === id; });
+                    var updated = current.filter(function (v) { return v.id !== id; });
+                    setVideos(updated);
+                    deleteVideoBlob(toDelete && toDelete.blob_id ? toDelete.blob_id : "").finally(function () {
+                        paintVideoList();
+                    });
+                });
+            });
+
+            list.querySelectorAll(".admin-move-up").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    moveVideo(btn.getAttribute("data-video-id"), -1);
+                });
+            });
+
+            list.querySelectorAll(".admin-move-down").forEach(function (btn) {
+                btn.addEventListener("click", function () {
+                    moveVideo(btn.getAttribute("data-video-id"), 1);
+                });
+            });
+        }
+
+        function paintAdmin() {
+            var isAdmin = localStorage.getItem(STORAGE_ADMIN) === "1";
+            loginView.style.display = isAdmin ? "none" : "block";
+            dashView.style.display = isAdmin ? "block" : "none";
+            if (isAdmin) {
+                paintSalesStats();
+                paintVideoList();
+            }
+        }
+
+        if (loginForm) {
+            loginForm.addEventListener("submit", function (e) {
+                e.preventDefault();
+                var data = new FormData(loginForm);
+                var username = (data.get("username") || "").toString().trim();
+                var password = (data.get("password") || "").toString().trim();
+                if (username === "admin" && password === "yestour111") {
+                    localStorage.setItem(STORAGE_ADMIN, "1");
+                    paintAdmin();
+                    return;
+                }
+                if (message) {
+                    message.style.display = "block";
+                    message.className = "auth-message error";
+                    message.textContent = "არასწორი მონაცემებია. მომხმარებელი: admin, პაროლი: yestour111";
+                }
+            });
+        }
+
+        if (logoutBtn) {
+            logoutBtn.addEventListener("click", function () {
+                localStorage.removeItem(STORAGE_ADMIN);
+                paintAdmin();
+            });
+        }
+
+        paintAdmin();
+    }
+
+    function escapeHtml(text) {
+        return String(text || "")
+            .replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+    }
+
+    function init() {
+        ensureLegacyUserMigrated();
+        initBackground();
+        initFaq();
+        initAuthModal();
+        initPricingActions();
+        initCoursePage();
+        initAdminPage();
+    }
+
+    if (document.readyState === "loading") {
+        document.addEventListener("DOMContentLoaded", init);
+    } else {
+        init();
+    }
+})();
 

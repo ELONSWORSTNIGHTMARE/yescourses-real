@@ -2,16 +2,19 @@
 <html lang="ka">
 <head>
     <meta charset="UTF-8">
-    <title>{% block title %}Yescourses{% endblock %}</title>
+    <title>Yescourses · Base</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="static/css/styles.css">
-    {% block extra_css %}{% endblock %}
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="background">
     <div id="circles-container"></div>
 </div>
-{% block body %}{% endblock %}
-{% block scripts %}{% endblock %}
+<main style="max-width:900px;margin:0 auto;padding:4rem 1.25rem;">
+    <h1 class="section-title">Static base page</h1>
+    <p class="section-subtitle">ამ პროექტში გამოყენებულია მხოლოდ HTML, CSS და JavaScript.</p>
+    <a class="btn-primary" href="index.html">მთავარზე დაბრუნება</a>
+</main>
+<script src="main.js"></script>
 </body>
 </html>

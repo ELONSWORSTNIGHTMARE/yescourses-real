@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -19,12 +19,9 @@ else:
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
 
-STATIC_DIR = os.path.join(BASE_DIR, "static")
 app = Flask(
     __name__,
     template_folder=BASE_DIR,
-    static_folder=STATIC_DIR,
-    static_url_path="/static",
 )
 app.config["SECRET_KEY"] = "change-this-secret-key"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -35,6 +32,56 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
+
+
+@app.route("/styles.css")
+def serve_css():
+    path = os.path.join(BASE_DIR, "styles.css")
+    if os.path.isfile(path):
+        try:
+            with open(path, "r", encoding="utf-8", errors="replace") as f:
+                css = f.read()
+            r = Response(css, mimetype="text/css")
+            r.headers["Cache-Control"] = "public, max-age=300"
+            return r
+        except Exception:
+            pass
+    path_public = os.path.join(PUBLIC_DIR, "styles.css")
+    if os.path.isfile(path_public):
+        try:
+            with open(path_public, "r", encoding="utf-8", errors="replace") as f:
+                css = f.read()
+            return Response(css, mimetype="text/css")
+        except Exception:
+            pass
+    return Response("/* styles.css not found */", mimetype="text/css", status=404)
+
+
+@app.route("/main.js")
+def serve_js():
+    for directory in (BASE_DIR, PUBLIC_DIR):
+        path = os.path.join(directory, "main.js")
+        if os.path.isfile(path):
+            r = send_from_directory(directory, "main.js", mimetype="application/javascript")
+            r.headers["Cache-Control"] = "public, max-age=300"
+            return r
+    return "// JS not found", 404, {"Content-Type": "application/javascript"}
+
+
+@app.route("/upload_video.css")
+def serve_upload_video_css():
+    path = os.path.join(BASE_DIR, "upload_video.css")
+    if os.path.isfile(path):
+        return send_from_directory(BASE_DIR, "upload_video.css", mimetype="text/css")
+    return "/* upload_video.css not found */", 404, {"Content-Type": "text/css"}
+
+
+@app.route("/upload_video.js")
+def serve_upload_video_js():
+    path = os.path.join(BASE_DIR, "upload_video.js")
+    if os.path.isfile(path):
+        return send_from_directory(BASE_DIR, "upload_video.js", mimetype="application/javascript")
+    return "// upload_video.js not found", 404, {"Content-Type": "application/javascript"}
 
 
 PACKS = {
@@ -138,7 +185,7 @@ def init_db():
             (
                 "matebedeladze@gmail.com",
                 "Admin",
-                generate_password_hash("Matebedeladze1", method="pbkdf2:sha256"),
+                generate_password_hash("Matebedeladze1"),
                 datetime.utcnow().isoformat(),
             ),
         )
@@ -220,7 +267,7 @@ def register():
             (
                 email,
                 name,
-                generate_password_hash(password, method="pbkdf2:sha256"),
+                generate_password_hash(password),
                 datetime.utcnow().isoformat(),
             ),
         )

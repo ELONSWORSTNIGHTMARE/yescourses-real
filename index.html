@@ -1,29 +1,41 @@
-{% extends "base.html" %}
-{% block title %}Yescourses{% endblock %}
-{% block body %}
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <title>Yescourses</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="background"><div id="circles-container"></div></div>
+
 <header class="main-header">
     <div class="logo">yescourses</div>
     <nav class="main-nav">
         <a href="#features">ფუნქციები</a>
         <a href="#join">შემოგვიერთდი</a>
         <a href="#about">ჩვენს შესახებ</a>
-        {% if user %}
-        <span class="user-name">{{ user.name }}</span>
-        <a href="{{ url_for('logout') }}" class="btn-secondary">გამოსვლა</a>
-        {% else %}
         <button class="btn-secondary" id="open-auth-modal">შესვლა / რეგისტრაცია</button>
-        {% endif %}
+        <div id="profile-menu-wrap" class="profile-menu-wrap" style="display:none;">
+            <button id="profile-avatar-btn" class="profile-avatar-btn" type="button" aria-label="Profile">
+                <span id="profile-avatar-initial">U</span>
+            </button>
+            <div id="profile-dropdown" class="profile-dropdown hidden">
+                <p id="profile-dropdown-name" class="profile-dropdown-name"></p>
+                <p id="profile-dropdown-email" class="profile-dropdown-email"></p>
+                <button id="open-settings-modal" class="btn-outline full-width" type="button">პარამეტრები</button>
+                <button id="logout-btn" class="btn-secondary full-width" type="button">გამოსვლა</button>
+            </div>
+        </div>
     </nav>
 </header>
 
 <main>
     <section class="hero">
-        <div class="hero-text">
+        <div class="hero-text" style="max-width: 40rem; margin: 0 auto;">
             <h1 class="hero-title">yescourses</h1>
             <p class="hero-subtitle">✈️ ისწავლე ჩვენთან და იმოგზაურე ჭკვიანად</p>
-            <p class="hero-description">
-                თანამედროვე ონლაინ კურსები მოგზაურობის, ბილეთების დაჯავშნის და ჭკვიანი გადაწყვეტილებებისთვის.
-            </p>
+            <p class="hero-description">თანამედროვე ონლაინ კურსები მოგზაურობის, ბილეთების დაჯავშნის და ჭკვიანი გადაწყვეტილებებისთვის.</p>
             <div class="hero-actions" id="join">
                 <button class="btn-primary" id="hero-start-btn">დაიწყე სწავლა დღესვე</button>
                 <a class="btn-outline" href="#pricing">ნახე პაკეტები</a>
@@ -35,32 +47,49 @@
         <h2 class="section-title">აირჩიე შენი პაკეტი</h2>
         <p class="section-subtitle">მონახე ის ფორმატი, რომელიც ყველაზე მეტად გიხდება.</p>
         <div class="pricing-grid">
-            {% for pack_id, pack in packs.items() %}
-            <div class="price-card{% if pack_id == 'plus' %} featured{% endif %}">
-                <div class="price-badge{% if pack_id == 'plus' %} accent{% endif %}">
-                    {% if pack_id == 'basic' %}საწყისი ვარიანტი{% elif pack_id == 'plus' %}ყველაზე პოპულარული{% else %}საუკეთესო მხარდაჭერა{% endif %}
-                </div>
-                <h3 class="price-title">{{ pack.name }}</h3>
+            <div class="price-card">
+                <div class="price-badge">საწყისი ვარიანტი</div>
+                <h3 class="price-title">Basic</h3>
                 <div class="price-row">
-                    <span class="current-price">{{ pack.price }}₾</span>
-                    {% if pack.old_price %}<span class="old-price">{{ pack.old_price }}₾</span>{% endif %}
+                    <span class="current-price">65₾</span>
                 </div>
                 <ul class="price-features">
-                    {% for item in pack.description %}
-                    <li>{{ item }}</li>
-                    {% endfor %}
+                    <li>სასწავლო ვიდეოები</li>
+                    <li>საბაზისო მხარდაჭერა</li>
+                    <li>24/7 წვდომა</li>
                 </ul>
-                {% if user and pack_id in purchased_pack_ids %}
-                <a href="{{ url_for('course', pack_id=pack_id) }}" class="btn-primary full-width">კურსის გვერდი</a>
-                {% elif user %}
-                <form action="{{ url_for('buy_pack', pack_id=pack_id) }}" method="post" class="inline-form">
-                    <button type="submit" class="btn-primary full-width">ვიყიდო</button>
-                </form>
-                {% else %}
-                <button type="button" class="btn-primary full-width choose-pack">ავირჩიო</button>
-                {% endif %}
+                <button type="button" class="btn-primary full-width pack-action" data-pack="basic">ვიყიდო</button>
             </div>
-            {% endfor %}
+
+            <div class="price-card featured">
+                <div class="price-badge accent">ყველაზე პოპულარული</div>
+                <h3 class="price-title">Plus</h3>
+                <div class="price-row">
+                    <span class="current-price">107₾</span>
+                    <span class="old-price">199₾</span>
+                </div>
+                <ul class="price-features">
+                    <li>ყველა Basic მასალა</li>
+                    <li>დამატებითი გაკვეთილები</li>
+                    <li>პრიორიტეტული დახმარება</li>
+                </ul>
+                <button type="button" class="btn-primary full-width pack-action" data-pack="plus">ვიყიდო</button>
+            </div>
+
+            <div class="price-card">
+                <div class="price-badge">საუკეთესო მხარდაჭერა</div>
+                <h3 class="price-title">Pro</h3>
+                <div class="price-row">
+                    <span class="current-price">349₾</span>
+                    <span class="old-price">399₾</span>
+                </div>
+                <ul class="price-features">
+                    <li>ყველა Plus მასალა</li>
+                    <li>1:1 მენტორის სესია</li>
+                    <li>შიდა ჯგუფზე წვდომა</li>
+                </ul>
+                <button type="button" class="btn-primary full-width pack-action" data-pack="pro">ვიყიდო</button>
+            </div>
         </div>
     </section>
 
@@ -68,22 +97,12 @@
         <h2 class="section-title">ხშირად დასმული კითხვები</h2>
         <div class="faq-list">
             <div class="faq-item">
-                <button class="faq-question">
-                    <span>რა არის yescourses?</span>
-                    <span class="faq-arrow">▼</span>
-                </button>
-                <div class="faq-answer">
-                    <p>yescourses არის yestour-ის ონლაინ სასწავლო პლატფორმა.</p>
-                </div>
+                <button class="faq-question"><span>რა არის yescourses?</span><span class="faq-arrow">▼</span></button>
+                <div class="faq-answer"><p>yescourses არის yestour-ის ონლაინ სასწავლო პლატფორმა.</p></div>
             </div>
             <div class="faq-item">
-                <button class="faq-question">
-                    <span>როგორ ხდება რეგისტრაცია?</span>
-                    <span class="faq-arrow">▼</span>
-                </button>
-                <div class="faq-answer">
-                    <p>ზედა მარჯვენა კუთხეში დააჭირე „შესვლა / რეგისტრაცია“-ს.</p>
-                </div>
+                <button class="faq-question"><span>როგორ ხდება რეგისტრაცია?</span><span class="faq-arrow">▼</span></button>
+                <div class="faq-answer"><p>დააჭირე „შესვლა / რეგისტრაცია“ და შეავსე ფორმა.</p></div>
             </div>
         </div>
     </section>
@@ -91,18 +110,9 @@
     <section id="features" class="section">
         <h2 class="section-title">რა დაგეხმარება yescourses?</h2>
         <div class="features-grid">
-            <div class="feature-card">
-                <h3>ჭკვიანი მოგზაურობა</h3>
-                <p>ისწავლე როგორ დაგეგმო მოგზაურობა ონლაინ.</p>
-            </div>
-            <div class="feature-card">
-                <h3>პრაქტიკული ტუტორიალები</h3>
-                <p>რეალური მაგალითებით გაკვეთილები.</p>
-            </div>
-            <div class="feature-card">
-                <h3>მენტორების მხარდაჭერა</h3>
-                <p>პირდაპირი კონტაქტი მენტორებთან.</p>
-            </div>
+            <div class="feature-card"><h3>ჭკვიანი მოგზაურობა</h3><p>ისწავლე როგორ დაგეგმო მოგზაურობა ონლაინ.</p></div>
+            <div class="feature-card"><h3>პრაქტიკული ტუტორიალები</h3><p>რეალური მაგალითებით გაკვეთილები.</p></div>
+            <div class="feature-card"><h3>მენტორების მხარდაჭერა</h3><p>პირდაპირი კონტაქტი მენტორებთან.</p></div>
         </div>
     </section>
 </main>
@@ -110,50 +120,80 @@
 <footer class="main-footer">
     <div class="footer-legal">
         <h3 id="about">ჩვენს შესახებ</h3>
-        <p>yescourses — yestour-ის ონლაინ სასწავლო პლატფორმა.</p>
-        <p>ტელ: <a href="tel:+995555494696">+995 555 494 696</a> · <a href="mailto:yestour111@gmail.com">yestour111@gmail.com</a></p>
-        <p class="footer-copyright">© 2026 Yescourses · yestour</p>
+        <p><strong>ინფორმაცია კომპანიის შესახებ</strong></p>
+        <p>yescourses — yestour-ის ონლაინ სასწავლო პლატფორმა. ვსწავლობთ ტურიზმს, ბილეთების ყიდვას, ჯავშნებს და მოგზაურობასთან დაკავშირებულ პრაქტიკულ უნარებს; კურსის დასრულების შემდეგ მონაწილეები იღებენ სერტიფიკატს.</p>
+
+        <h3>მერჩანტის საკონტაქტო ინფორმაცია</h3>
+        <p>ტელეფონი: <a href="tel:+995555494696">+995 555 494 696</a></p>
+        <p>ელფოსტა: <a href="mailto:yestour111@gmail.com">yestour111@gmail.com</a></p>
+
+        <h3>პროდუქტის/მომსახურების აღწერა</h3>
+        <p>კურსები, რომლებიც ასწავლის ტურიზმს, ბილეთების ყიდვას, ჯავშნების გაკეთებას და მოგზაურობასთან დაკავშირებულ უნარებს. კურსების დასრულების შემდეგ მონაწილეები იღებენ სერტიფიკატს.</p>
+
+        <h3>შეკვეთის მიწოდების, დაბრუნების, გაუქმების და თანხის დაბრუნების პოლიტიკა</h3>
+        <p>კურსების სწავლება ხდება ონლაინ. თანხის დაბრუნება კურსების ყიდვის შემდეგ შეუძლებელია.</p>
+
+        <h3>კონფიდენციალურობის პოლიტიკა</h3>
+        <p>ჩვენ ვიყენებთ მხოლოდ იმ მონაცემებს, რაც საჭიროა რეგისტრაციისა და კურსებზე წვდომისთვის. თქვენი ელფოსტა და პირადი ინფორმაცია არ გადაეცემა მესამე მხარეს. მონაცემების დაცვა ხორციელდება შესაბამისი ტექნიკური და ორგანიზაციული ზომებით.</p>
+        <p style="margin-top:1rem;color:#6b7280;">© 2026 Yescourses · yestour</p>
     </div>
 </footer>
 
-{% if not user %}
 <div id="auth-modal" class="modal hidden">
     <div class="modal-content">
         <button class="modal-close" id="close-auth-modal">&times;</button>
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div id="auth-message" class="auth-message {{ messages[0][0] or '' }}">{{ messages[0][1] }}</div>
-        {% else %}
         <div id="auth-message" class="auth-message"></div>
-        {% endif %}
-        {% endwith %}
         <div class="modal-tabs">
             <button class="tab-button active" data-tab="register-tab">რეგისტრაცია</button>
             <button class="tab-button" data-tab="login-tab">შესვლა</button>
         </div>
         <div class="tab-panel active" id="register-tab">
-            <form class="auth-form" id="register-form" action="{{ url_for('register') }}" method="post">
-                <label>სრული სახელი <input type="text" name="name" placeholder="მაგ: ნინო ბერიძე" required></label>
-                <label>ელფოსტა <input type="email" name="email" placeholder="you@example.com" required></label>
-                <label>პაროლი <input type="password" name="password" minlength="6" required></label>
+            <form class="auth-form" id="register-form">
+                <label>სრული სახელი <input type="text" name="name" required></label>
+                <label>ელფოსტა <input type="email" name="email" required></label>
+                <label>პაროლი
+                    <div class="password-field">
+                        <input type="password" name="password" minlength="6" required>
+                        <button class="password-toggle" type="button" aria-label="Show password">👁</button>
+                    </div>
+                </label>
                 <button type="submit" class="btn-primary full-width">რეგისტრაცია</button>
             </form>
         </div>
         <div class="tab-panel" id="login-tab">
-            <form class="auth-form" id="login-form" action="{{ url_for('login') }}" method="post">
+            <form class="auth-form" id="login-form">
                 <label>ელფოსტა <input type="email" name="email" required></label>
-                <label>პაროლი <input type="password" name="password" required></label>
+                <label>პაროლი
+                    <div class="password-field">
+                        <input type="password" name="password" required>
+                        <button class="password-toggle" type="button" aria-label="Show password">👁</button>
+                    </div>
+                </label>
                 <button type="submit" class="btn-primary full-width">შესვლა</button>
             </form>
         </div>
     </div>
 </div>
-{% endif %}
-{% endblock %}
 
-{% block extra_css %}
-<link rel="stylesheet" href="static/css/index.css">
-{% endblock %}
-{% block scripts %}
-<script src="static/js/index.js"></script>
-{% endblock %}
+<div id="settings-modal" class="modal hidden">
+    <div class="modal-content">
+        <button class="modal-close" id="close-settings-modal">&times;</button>
+        <h3 style="margin-bottom:1rem;">პროფილის პარამეტრები</h3>
+        <div id="settings-message" class="auth-message"></div>
+        <p style="color:#9ca3af;margin-bottom:0.8rem;">მომხმარებელი: <strong id="settings-username"></strong></p>
+        <p style="color:#9ca3af;margin-bottom:1rem;">ელფოსტა: <strong id="settings-email"></strong></p>
+        <form id="change-password-form" class="auth-form">
+            <label>ახალი პაროლი
+                <div class="password-field">
+                    <input type="password" name="new_password" minlength="6" required>
+                    <button class="password-toggle" type="button" aria-label="Show password">👁</button>
+                </div>
+            </label>
+            <button type="submit" class="btn-primary full-width">პაროლის შეცვლა</button>
+        </form>
+    </div>
+</div>
+
+<script src="main.js"></script>
+</body>
+</html>

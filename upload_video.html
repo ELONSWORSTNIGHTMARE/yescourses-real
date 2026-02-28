@@ -4,14 +4,15 @@
     <meta charset="UTF-8">
     <title>Yescourses · ვიდეოს ატვირთვა</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="static/css/upload_video.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
+    <div class="background"><div id="circles-container"></div></div>
     <header class="uv-header">
         <span class="uv-logo">yescourses</span>
         <nav class="uv-nav">
-            <a href="{{ url_for('admin_page') }}" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
-            <a href="{{ url_for('course', pack_id='basic') }}" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
+            <a href="admin.html" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
+            <a href="course.html?pack=basic" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
         </nav>
     </header>
 
@@ -19,20 +20,16 @@
         <h1 class="uv-title">ვიდეოს ატვირთვა</h1>
         <p class="uv-subtitle">აირჩიე ფაილი და დააჭირე „ატვირთვა“ — ვიდეო გამოჩნდება კურსის გვერდზე.</p>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div class="uv-message {{ messages[0][0] or '' }}">{{ messages[0][1] }}</div>
-        {% endif %}
-        {% endwith %}
+        <div id="upload-message" class="uv-message" style="display:none;"></div>
 
         <div class="uv-card">
-            <form id="upload-video-form" class="uv-form" action="{{ url_for('admin_upload_video') }}" method="post" enctype="multipart/form-data">
+            <form id="upload-video-form" class="uv-form">
                 <label>
                     <span>პაკეტი</span>
                     <select name="pack_id" required>
-                        {% for pid, pack in packs.items() %}
-                        <option value="{{ pid }}">{{ pack.name }}</option>
-                        {% endfor %}
+                        <option value="basic">Basic</option>
+                        <option value="plus">Plus</option>
+                        <option value="pro">Pro</option>
                     </select>
                 </label>
                 <label>
@@ -62,6 +59,7 @@
         © 2026 Yescourses · Admin
     </footer>
 
-    <script src="static/js/upload_video.js"></script>
+    <script src="main.js"></script>
+    <script src="upload_video.js"></script>
 </body>
 </html>
