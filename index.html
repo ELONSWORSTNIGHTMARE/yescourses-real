@@ -1,0 +1,159 @@
+{% extends "base.html" %}
+{% block title %}Yescourses{% endblock %}
+{% block body %}
+<header class="main-header">
+    <div class="logo">yescourses</div>
+    <nav class="main-nav">
+        <a href="#features">ფუნქციები</a>
+        <a href="#join">შემოგვიერთდი</a>
+        <a href="#about">ჩვენს შესახებ</a>
+        {% if user %}
+        <span class="user-name">{{ user.name }}</span>
+        <a href="{{ url_for('logout') }}" class="btn-secondary">გამოსვლა</a>
+        {% else %}
+        <button class="btn-secondary" id="open-auth-modal">შესვლა / რეგისტრაცია</button>
+        {% endif %}
+    </nav>
+</header>
+
+<main>
+    <section class="hero">
+        <div class="hero-text">
+            <h1 class="hero-title">yescourses</h1>
+            <p class="hero-subtitle">✈️ ისწავლე ჩვენთან და იმოგზაურე ჭკვიანად</p>
+            <p class="hero-description">
+                თანამედროვე ონლაინ კურსები მოგზაურობის, ბილეთების დაჯავშნის და ჭკვიანი გადაწყვეტილებებისთვის.
+            </p>
+            <div class="hero-actions" id="join">
+                <button class="btn-primary" id="hero-start-btn">დაიწყე სწავლა დღესვე</button>
+                <a class="btn-outline" href="#pricing">ნახე პაკეტები</a>
+            </div>
+        </div>
+    </section>
+
+    <section id="pricing" class="section">
+        <h2 class="section-title">აირჩიე შენი პაკეტი</h2>
+        <p class="section-subtitle">მონახე ის ფორმატი, რომელიც ყველაზე მეტად გიხდება.</p>
+        <div class="pricing-grid">
+            {% for pack_id, pack in packs.items() %}
+            <div class="price-card{% if pack_id == 'plus' %} featured{% endif %}">
+                <div class="price-badge{% if pack_id == 'plus' %} accent{% endif %}">
+                    {% if pack_id == 'basic' %}საწყისი ვარიანტი{% elif pack_id == 'plus' %}ყველაზე პოპულარული{% else %}საუკეთესო მხარდაჭერა{% endif %}
+                </div>
+                <h3 class="price-title">{{ pack.name }}</h3>
+                <div class="price-row">
+                    <span class="current-price">{{ pack.price }}₾</span>
+                    {% if pack.old_price %}<span class="old-price">{{ pack.old_price }}₾</span>{% endif %}
+                </div>
+                <ul class="price-features">
+                    {% for item in pack.description %}
+                    <li>{{ item }}</li>
+                    {% endfor %}
+                </ul>
+                {% if user and pack_id in purchased_pack_ids %}
+                <a href="{{ url_for('course', pack_id=pack_id) }}" class="btn-primary full-width">კურსის გვერდი</a>
+                {% elif user %}
+                <form action="{{ url_for('buy_pack', pack_id=pack_id) }}" method="post" class="inline-form">
+                    <button type="submit" class="btn-primary full-width">ვიყიდო</button>
+                </form>
+                {% else %}
+                <button type="button" class="btn-primary full-width choose-pack">ავირჩიო</button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </section>
+
+    <section class="section">
+        <h2 class="section-title">ხშირად დასმული კითხვები</h2>
+        <div class="faq-list">
+            <div class="faq-item">
+                <button class="faq-question">
+                    <span>რა არის yescourses?</span>
+                    <span class="faq-arrow">▼</span>
+                </button>
+                <div class="faq-answer">
+                    <p>yescourses არის yestour-ის ონლაინ სასწავლო პლატფორმა.</p>
+                </div>
+            </div>
+            <div class="faq-item">
+                <button class="faq-question">
+                    <span>როგორ ხდება რეგისტრაცია?</span>
+                    <span class="faq-arrow">▼</span>
+                </button>
+                <div class="faq-answer">
+                    <p>ზედა მარჯვენა კუთხეში დააჭირე „შესვლა / რეგისტრაცია“-ს.</p>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section id="features" class="section">
+        <h2 class="section-title">რა დაგეხმარება yescourses?</h2>
+        <div class="features-grid">
+            <div class="feature-card">
+                <h3>ჭკვიანი მოგზაურობა</h3>
+                <p>ისწავლე როგორ დაგეგმო მოგზაურობა ონლაინ.</p>
+            </div>
+            <div class="feature-card">
+                <h3>პრაქტიკული ტუტორიალები</h3>
+                <p>რეალური მაგალითებით გაკვეთილები.</p>
+            </div>
+            <div class="feature-card">
+                <h3>მენტორების მხარდაჭერა</h3>
+                <p>პირდაპირი კონტაქტი მენტორებთან.</p>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer class="main-footer">
+    <div class="footer-legal">
+        <h3 id="about">ჩვენს შესახებ</h3>
+        <p>yescourses — yestour-ის ონლაინ სასწავლო პლატფორმა.</p>
+        <p>ტელ: <a href="tel:+995555494696">+995 555 494 696</a> · <a href="mailto:yestour111@gmail.com">yestour111@gmail.com</a></p>
+        <p class="footer-copyright">© 2026 Yescourses · yestour</p>
+    </div>
+</footer>
+
+{% if not user %}
+<div id="auth-modal" class="modal hidden">
+    <div class="modal-content">
+        <button class="modal-close" id="close-auth-modal">&times;</button>
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div id="auth-message" class="auth-message {{ messages[0][0] or '' }}">{{ messages[0][1] }}</div>
+        {% else %}
+        <div id="auth-message" class="auth-message"></div>
+        {% endif %}
+        {% endwith %}
+        <div class="modal-tabs">
+            <button class="tab-button active" data-tab="register-tab">რეგისტრაცია</button>
+            <button class="tab-button" data-tab="login-tab">შესვლა</button>
+        </div>
+        <div class="tab-panel active" id="register-tab">
+            <form class="auth-form" id="register-form" action="{{ url_for('register') }}" method="post">
+                <label>სრული სახელი <input type="text" name="name" placeholder="მაგ: ნინო ბერიძე" required></label>
+                <label>ელფოსტა <input type="email" name="email" placeholder="you@example.com" required></label>
+                <label>პაროლი <input type="password" name="password" minlength="6" required></label>
+                <button type="submit" class="btn-primary full-width">რეგისტრაცია</button>
+            </form>
+        </div>
+        <div class="tab-panel" id="login-tab">
+            <form class="auth-form" id="login-form" action="{{ url_for('login') }}" method="post">
+                <label>ელფოსტა <input type="email" name="email" required></label>
+                <label>პაროლი <input type="password" name="password" required></label>
+                <button type="submit" class="btn-primary full-width">შესვლა</button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="static/css/index.css">
+{% endblock %}
+{% block scripts %}
+<script src="static/js/index.js"></script>
+{% endblock %}

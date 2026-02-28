@@ -1,0 +1,45 @@
+/* admin.css — page-specific styles for admin.html */
+
+.admin-gate-header {
+    position: relative;
+}
+
+.admin-gate .auth-message {
+    max-width: 24rem;
+    margin: 0 auto 1rem;
+}
+
+.admin-card .upload-hint {
+    margin-bottom: 1rem;
+    color: #9ca3af;
+}
+
+.btn-inline-block {
+    display: inline-block;
+    text-align: center;
+}
+
+.admin-card .stats-list.videos-list {
+    list-style: none;
+    padding: 0;
+}
+
+.admin-card .video-list-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0.5rem 0;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.2);
+}
+
+.admin-card .video-list-item form {
+    margin: 0;
+}
+
+.admin-card .empty-videos {
+    color: #9ca3af;
+}
+
+.admin-card .course-link {
+    margin-bottom: 0.75rem;
+}

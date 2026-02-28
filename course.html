@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Yescourses · კურსი{% endblock %}
+{% block body %}
+<header class="main-header">
+    <div class="logo">yescourses</div>
+    <nav class="main-nav">
+        <a href="{{ url_for('index') }}">მთავარი</a>
+        <a href="{{ url_for('index') }}#pricing">პაკეტები</a>
+        <a href="#discord">Discord</a>
+        {% if is_admin %}<a href="{{ url_for('admin_page') }}" class="btn-secondary">ადმინ პანელი</a>{% endif %}
+    </nav>
+</header>
+
+<main>
+    <section class="section course-hero">
+        <h2 class="section-title">შენი კურსის სივრცე — {{ pack.name }}</h2>
+        <p class="section-subtitle">
+            აქ გამოჩნდება შენთვის ხელმისაწვდომი ვიდეო გაკვეთილები და მასალები.
+        </p>
+    </section>
+
+    <section class="section">
+        <div class="videos-list">
+            {% for v in videos %}
+            <article class="video-card">
+                <div class="video-header">
+                    <span class="video-order">#{{ loop.index }}</span>
+                    <h3 class="video-title">{{ v.title }}</h3>
+                </div>
+                {% if v.description %}
+                <p class="video-description">{{ v.description }}</p>
+                {% endif %}
+                <div class="video-player-wrapper">
+                    <video class="video-player" controls preload="metadata" src="{{ url_for('uploaded_file', filename=v.filename) }}">
+                        თქვენი ბრაუზერი ვიდეოს არ იგებს.
+                    </video>
+                </div>
+            </article>
+            {% else %}
+            <article class="video-card">
+                <div class="video-header">
+                    <h3 class="video-title">ჯერ ვიდეოები არ არის</h3>
+                </div>
+                <p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p>
+            </article>
+            {% endfor %}
+        </div>
+    </section>
+
+    {% if is_admin %}
+    <section class="section">
+        <div class="admin-card">
+            <h3 class="section-title">ადმინი: ვიდეოს ატვირთვა ამ კურსზე</h3>
+            <form id="course-upload-form" class="auth-form" action="{{ url_for('course_upload_video', pack_id=pack_id) }}" method="post" enctype="multipart/form-data" data-redirect-url="{{ url_for('course', pack_id=pack_id) }}">
+                <input type="hidden" name="pack_id" value="{{ pack_id }}">
+                <label>სათაური
+                    <input type="text" name="title" required placeholder="მაგ: გაკვეთილი 1">
+                </label>
+                <label>აღწერა
+                    <textarea name="description" rows="2" placeholder="აღწერა (არასავალდებულო)"></textarea>
+                </label>
+                <label>რიგითობა
+                    <input type="number" name="order_index" value="1" min="1">
+                </label>
+                <label class="upload-zone" id="course-upload-zone">
+                    <span class="upload-label">ვიდეო ფაილი — გადმოიწიე ან დააჭირე</span>
+                    <span class="file-name" id="course-upload-filename"></span>
+                    <input type="file" name="video_file" id="course-video-file" accept="video/*" required>
+                </label>
+                <button type="submit" class="btn-primary full-width">ატვირთვა</button>
+            </form>
+        </div>
+    </section>
+    {% endif %}
+
+    <section id="discord" class="section join-section">
+        <div class="join-card">
+            <h2>შემოგვიერთდი Discord-ზე</h2>
+            <p>
+                ჩაერთე დახურულ ჯგუფში, დაუსვი კითხვები მენტორებს და იმუშავე სხვა სტუდენტებთან ერთად.
+            </p>
+            <a class="btn-outline" href="#" target="_blank">
+                Discord ჯგუფი (ბმული დაემატება მოგვიანებით)
+            </a>
+        </div>
+    </section>
+</main>
+
+<footer class="main-footer">
+    <p>© 2026 Yescourses · yestour</p>
+</footer>
+{% endblock %}
+
+{% block extra_css %}
+<link rel="stylesheet" href="static/css/course.css">
+{% endblock %}
+{% block scripts %}
+<script src="static/js/course.js"></script>
+{% endblock %}

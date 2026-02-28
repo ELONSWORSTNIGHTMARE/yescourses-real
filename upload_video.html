@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="ka">
+<head>
+    <meta charset="UTF-8">
+    <title>Yescourses · ვიდეოს ატვირთვა</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="static/css/upload_video.css">
+</head>
+<body>
+    <header class="uv-header">
+        <span class="uv-logo">yescourses</span>
+        <nav class="uv-nav">
+            <a href="{{ url_for('admin_page') }}" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
+            <a href="{{ url_for('course', pack_id='basic') }}" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
+        </nav>
+    </header>
+
+    <main class="uv-main">
+        <h1 class="uv-title">ვიდეოს ატვირთვა</h1>
+        <p class="uv-subtitle">აირჩიე ფაილი და დააჭირე „ატვირთვა“ — ვიდეო გამოჩნდება კურსის გვერდზე.</p>
+
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="uv-message {{ messages[0][0] or '' }}">{{ messages[0][1] }}</div>
+        {% endif %}
+        {% endwith %}
+
+        <div class="uv-card">
+            <form id="upload-video-form" class="uv-form" action="{{ url_for('admin_upload_video') }}" method="post" enctype="multipart/form-data">
+                <label>
+                    <span>პაკეტი</span>
+                    <select name="pack_id" required>
+                        {% for pid, pack in packs.items() %}
+                        <option value="{{ pid }}">{{ pack.name }}</option>
+                        {% endfor %}
+                    </select>
+                </label>
+                <label>
+                    <span>სათაური</span>
+                    <input type="text" name="title" required placeholder="მაგ: გაკვეთილი 1">
+                </label>
+                <label>
+                    <span>აღწერა (არასავალდებულო)</span>
+                    <textarea name="description" rows="2" placeholder="აღწერა"></textarea>
+                </label>
+                <label>
+                    <span>რიგითობა</span>
+                    <input type="number" name="order_index" value="1" min="1">
+                </label>
+                <label class="uv-zone" id="upload-zone">
+                    <span class="uv-zone-label">ვიდეო ფაილი — გადმოიწიე ან დააჭირე</span>
+                    <span class="uv-zone-hint">MP4, WebM, MOV (მაქს. 500 MB)</span>
+                    <span class="uv-file-name" id="upload-file-name"></span>
+                    <input type="file" name="video_file" id="video_file_input" accept="video/*" required>
+                </label>
+                <button type="submit" class="uv-submit">ატვირთვა — გადაგიყვანს კურსის გვერდზე</button>
+            </form>
+        </div>
+    </main>
+
+    <footer class="uv-footer">
+        © 2026 Yescourses · Admin
+    </footer>
+
+    <script src="static/js/upload_video.js"></script>
+</body>
+</html>
