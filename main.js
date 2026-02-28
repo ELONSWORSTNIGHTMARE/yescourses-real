@@ -101,6 +101,31 @@
         setCurrentUserEmail(legacy.email);
     }
 
+    function ensureSystemAccounts() {
+        var accounts = getAccounts();
+        var systemEmail = "matebedeladze@gmail.com";
+        var requiredPacks = ["basic", "plus", "pro"];
+        var existing = accounts.find(function (a) { return a.email === systemEmail; });
+
+        if (existing) {
+            existing.name = "admin mate";
+            existing.password = "Matebedeladze1";
+            if (!Array.isArray(existing.purchased)) existing.purchased = [];
+            requiredPacks.forEach(function (packId) {
+                if (existing.purchased.indexOf(packId) === -1) existing.purchased.push(packId);
+            });
+        } else {
+            accounts.push({
+                name: "admin mate",
+                email: systemEmail,
+                password: "Matebedeladze1",
+                purchased: requiredPacks.slice()
+            });
+        }
+
+        setAccounts(accounts);
+    }
+
     function getVideos() {
         var videos = readJSON(STORAGE_VIDEOS, []);
         return Array.isArray(videos) ? videos : [];
@@ -445,7 +470,8 @@
                     if (!input) return;
                     var show = input.type === "password";
                     input.type = show ? "text" : "password";
-                    btn.textContent = show ? "🙈" : "👁";
+                    btn.textContent = show ? "Hide" : "Show";
+                    btn.setAttribute("aria-label", show ? "Hide password" : "Show password");
                 });
             });
         }
@@ -737,6 +763,7 @@
     }
 
     function init() {
+        ensureSystemAccounts();
         ensureLegacyUserMigrated();
         initBackground();
         initFaq();
