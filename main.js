@@ -104,7 +104,7 @@
     function ensureSystemAccounts() {
         var accounts = getAccounts();
         var systemEmail = "matebedeladze@gmail.com";
-        var requiredPacks = ["basic", "plus", "pro"];
+        var requiredPacks = ["basic", "plus", "premium"];
         var existing = accounts.find(function (a) { return a.email === systemEmail; });
 
         if (existing) {
@@ -530,9 +530,13 @@
             return;
         }
 
-        var packNames = { basic: "Basic", plus: "Plus", pro: "Pro" };
+        var packNames = {
+            basic: "საწყისი პაკეტი",
+            plus: "სრული მენტორშიპი",
+            premium: "1-1 Mentorship"
+        };
         var title = document.getElementById("course-title");
-        if (title) title.textContent = "შენი კურსის სივრცე — " + (packNames[pack] || "Basic");
+        if (title) title.textContent = "შენი კურსის სივრცე — " + (packNames[pack] || "საწყისი პაკეტი");
 
         var videos = getVideos();
         var filtered = videos.filter(function (v) { return v.pack_id === pack; });
@@ -591,7 +595,7 @@
             var accounts = getAccounts();
             var basic = accounts.filter(function (a) { return userHasPack(a, "basic"); }).length;
             var plus = accounts.filter(function (a) { return userHasPack(a, "plus"); }).length;
-            var pro = accounts.filter(function (a) { return userHasPack(a, "pro"); }).length;
+            var pro = accounts.filter(function (a) { return userHasPack(a, "premium"); }).length;
             if (statBasic) statBasic.textContent = basic + " გაყიდვა";
             if (statPlus) statPlus.textContent = plus + " გაყიდვა";
             if (statPro) statPro.textContent = pro + " გაყიდვა";
@@ -643,7 +647,7 @@
                     '<li style="padding:0.8rem 0;border-bottom:1px solid rgba(148,163,184,0.2);" data-row-id="' + id + '">',
                     '<div style="display:grid;grid-template-columns:2fr 1fr 100px;gap:0.6rem;margin-bottom:0.6rem;">',
                     '<input type="text" class="admin-video-title" value="' + safeTitle + '" placeholder="სათაური">',
-                    '<select class="admin-video-pack"><option value="basic">Basic</option><option value="plus">Plus</option><option value="pro">Pro</option></select>',
+                    '<select class="admin-video-pack"><option value="basic">საწყისი პაკეტი</option><option value="plus">სრული მენტორშიპი</option><option value="premium">1-1 Mentorship</option></select>',
                     '<input type="number" class="admin-video-order" min="1" value="' + order + '">',
                     '</div>',
                     '<textarea class="admin-video-desc" rows="2" placeholder="აღწერა" style="width:100%;margin-bottom:0.6rem;">' + safeDesc + '</textarea>',

@@ -51,16 +51,16 @@
                 <div class="admin-card">
                     <h3>გაყიდვების სტატისტიკა (დემო)</h3>
                     <ul class="stats-list">
-                        <li><span>Basic</span><span id="admin-stat-basic" class="stat-count">0 გაყიდვა</span></li>
-                        <li><span>Plus</span><span id="admin-stat-plus" class="stat-count">0 გაყიდვა</span></li>
-                        <li><span>Pro</span><span id="admin-stat-pro" class="stat-count">0 გაყიდვა</span></li>
+                        <li><span>საწყისი პაკეტი</span><span id="admin-stat-basic" class="stat-count">0 გაყიდვა</span></li>
+                        <li><span>სრული მენტორშიპი</span><span id="admin-stat-plus" class="stat-count">0 გაყიდვა</span></li>
+                        <li><span>1-1 Mentorship</span><span id="admin-stat-pro" class="stat-count">0 გაყიდვა</span></li>
                     </ul>
                 </div>
 
                 <div class="admin-card">
                     <h3>ვიდეოს ატვირთვა</h3>
                     <p style="margin-bottom:1rem;color:#9ca3af;">გადადით ატვირთვის გვერდზე და დაამატეთ ახალი ვიდეო.</p>
-                    <a href="upload_video.html" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
+                    <a href="{{ url_for('admin_upload_video_page') }}" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
                 </div>
             </div>
 
