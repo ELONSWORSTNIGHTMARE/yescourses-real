@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, Response, jsonify
+from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, Response
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
@@ -239,8 +239,7 @@ def redirect_old_admin():
 
 @app.route("/course.html")
 def redirect_old_course():
-    pack_id = request.args.get("pack", "basic")
-    return course(pack_id)
+    return redirect(url_for("index"))
 
 
 @app.route("/")
@@ -359,8 +358,6 @@ def course(pack_id):
         flash("კურსზე წვდომისთვის საჭიროა ავტორიზაცია.", "error")
         return redirect(url_for("index"))
 
-    # Temporary testing mode: any logged-in user can access course videos.
-    # Later we can restore purchase-only access using user_has_pack.
     is_admin = session.get("is_admin") or (user and user.get("email") == ADMIN_EMAIL)
 
     conn = get_db()
@@ -379,40 +376,6 @@ def course(pack_id):
         videos=videos,
         user=user,
         is_admin=is_admin,
-    )
-
-
-@app.route("/api/videos/<pack_id>")
-def api_videos(pack_id):
-    if pack_id not in PACKS:
-        return jsonify({"error": "invalid pack"}), 404
-
-    user = get_current_user()
-    if not user:
-        return jsonify({"error": "auth required"}), 401
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT id, title, description, filename, order_index FROM videos WHERE pack_id = ? ORDER BY order_index ASC, uploaded_at ASC",
-        (pack_id,),
-    )
-    rows = cur.fetchall()
-    conn.close()
-
-    return jsonify(
-        {
-            "videos": [
-                {
-                    "id": row["id"],
-                    "title": row["title"],
-                    "description": row["description"] or "",
-                    "order_index": row["order_index"],
-                    "url": url_for("uploaded_file", filename=row["filename"]),
-                }
-                for row in rows
-            ]
-        }
     )
 
 
