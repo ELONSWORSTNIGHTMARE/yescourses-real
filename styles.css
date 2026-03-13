@@ -380,11 +380,12 @@ main {
     justify-content: center;
     padding: 0.6rem 1.2rem;
     border-radius: 999px;
-    border: none;
+    border: 1px solid transparent;
     cursor: pointer;
     font-size: 0.95rem;
-    font-weight: 500;
-    transition: all 0.15s ease;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    transition: transform 0.15s ease, box-shadow 0.2s ease, background 0.2s ease, border-color 0.2s ease;
     white-space: nowrap;
 }
 
@@ -400,23 +401,26 @@ main {
 }
 
 .btn-secondary {
-    background: rgba(15, 23, 42, 0.6);
+    background: linear-gradient(180deg, rgba(30, 41, 59, 0.85), rgba(15, 23, 42, 0.92));
     color: #e5e7eb;
-    border: 1px solid rgba(148, 163, 184, 0.5);
+    border-color: rgba(148, 163, 184, 0.55);
 }
 
 .btn-secondary:hover {
-    background: rgba(15, 23, 42, 0.9);
+    transform: translateY(-1px);
+    background: linear-gradient(180deg, rgba(51, 65, 85, 0.9), rgba(15, 23, 42, 0.98));
 }
 
 .btn-outline {
-    background: transparent;
+    background: rgba(15, 23, 42, 0.45);
     color: #e5e7eb;
-    border: 1px solid rgba(148, 163, 184, 0.6);
+    border-color: rgba(148, 163, 184, 0.6);
 }
 
 .btn-outline:hover {
-    background: rgba(15, 23, 42, 0.8);
+    transform: translateY(-1px);
+    background: rgba(30, 41, 59, 0.72);
+    border-color: rgba(129, 140, 248, 0.65);
 }
 
 .btn-danger {
@@ -425,7 +429,16 @@ main {
 }
 
 .btn-danger:hover {
+    transform: translateY(-1px);
     background: rgba(220, 38, 38, 1);
+}
+
+.btn-primary:focus-visible,
+.btn-secondary:focus-visible,
+.btn-outline:focus-visible,
+.btn-danger:focus-visible {
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(129, 140, 248, 0.35);
 }
 
 .full-width {
