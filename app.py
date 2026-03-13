@@ -88,8 +88,8 @@ PACKS = {
     "basic": {
         "id": "basic",
         "name": "საწყისი პაკეტი",
-        "price": 65,
-        "old_price": 90,
+        "price": 99,
+        "old_price": 149,
         "description": [
             "ონლაინ ტუტორიალები",
             "ბილეთების ყიდვა",
@@ -101,8 +101,8 @@ PACKS = {
     "plus": {
         "id": "plus",
         "name": "სრული მენტორშიპი",
-        "price": 107,
-        "old_price": 190,
+        "price": 199,
+        "old_price": 249,
         "description": [
             "იდეალურია მათთვის, ვინც ნულიდან იწყებს.",
             "კვირაში 2-3 ლექცია",
@@ -320,6 +320,9 @@ def logout():
 def buy_pack(pack_id):
     if pack_id not in PACKS:
         flash("ასეთი პაკეტი არ არსებობს.", "error")
+        return redirect(url_for("index"))
+    if pack_id != "basic":
+        flash("ეს შეთავაზება დროებით მიუწვდომელია.", "info")
         return redirect(url_for("index"))
     user = get_current_user()
     if not user:
