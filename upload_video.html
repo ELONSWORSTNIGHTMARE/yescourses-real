@@ -11,8 +11,8 @@
     <header class="uv-header">
         <span class="uv-logo">yescourses</span>
         <nav class="uv-nav">
-            <a href="admin.html" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
-            <a href="course.html?pack=basic" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
+            <a href="/admin.html" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
+            <a href="/course.html?pack=basic" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
         </nav>
     </header>
 
@@ -23,13 +23,13 @@
         <div id="upload-message" class="uv-message" style="display:none;"></div>
 
         <div class="uv-card">
-            <form id="upload-video-form" class="uv-form">
+            <form id="upload-video-form" class="uv-form" method="post" action="/admin/upload_video" enctype="multipart/form-data">
                 <label>
                     <span>პაკეტი</span>
                     <select name="pack_id" required>
                         <option value="basic">საწყისი პაკეტი</option>
                         <option value="plus">სრული მენტორშიპი</option>
-                        <option value="pro">1-1 Mentorship</option>
+                        <option value="premium">1-1 Mentorship</option>
                     </select>
                 </label>
                 <label>

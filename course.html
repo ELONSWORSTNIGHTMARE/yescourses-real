@@ -12,28 +12,44 @@
 <header class="main-header">
     <div class="logo">yescourses</div>
     <nav class="main-nav">
-        <a href="index.html">მთავარი</a>
-        <a href="index.html#pricing">პაკეტები</a>
-        <a href="#discord">Discord</a>
-        <a href="admin.html" class="btn-secondary">ადმინ პანელი</a>
+        <a href="/">მთავარი</a>
+        <a href="/#pricing">პაკეტები</a>
+        <a href="/admin.html" class="btn-secondary">ადმინ პანელი</a>
     </nav>
 </header>
 
 <main>
     <section class="section course-hero">
-        <h2 id="course-title" class="section-title">შენი კურსის სივრცე — Basic</h2>
+        <h2 class="section-title">შენი კურსის სივრცე — {{ pack.name }}</h2>
         <p class="section-subtitle">აქ გამოჩნდება შენთვის ხელმისაწვდომი ვიდეო გაკვეთილები და მასალები.</p>
     </section>
 
     <section class="section">
-        <div id="videos-list" class="videos-list"></div>
-    </section>
-
-    <section id="discord" class="section join-section">
-        <div class="join-card">
-            <h2>შემოგვიერთდი Discord-ზე</h2>
-            <p>ჩაერთე დახურულ ჯგუფში, დაუსვი კითხვები მენტორებს და იმუშავე სხვა სტუდენტებთან ერთად.</p>
-            <a class="btn-outline" href="#" target="_blank">Discord ჯგუფი (ბმული დაემატება მოგვიანებით)</a>
+        <div class="videos-list">
+            {% if videos %}
+                {% for video in videos %}
+                <article class="video-card">
+                    <div class="video-header">
+                        <span class="video-order">#{{ loop.index }}</span>
+                        <h3 class="video-title">{{ video.title }}</h3>
+                    </div>
+                    {% if video.description %}
+                    <p class="video-description">{{ video.description }}</p>
+                    {% endif %}
+                    <div class="video-player-wrapper">
+                        <video class="video-player" controls preload="metadata">
+                            <source src="{{ url_for('uploaded_file', filename=video.filename) }}">
+                            თქვენი ბრაუზერი ვიდეოს არ უჭერს მხარს.
+                        </video>
+                    </div>
+                </article>
+                {% endfor %}
+            {% else %}
+                <article class="video-card">
+                    <div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div>
+                    <p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p>
+                </article>
+            {% endif %}
         </div>
     </section>
 </main>
