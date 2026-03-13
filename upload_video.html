@@ -4,59 +4,45 @@
     <meta charset="UTF-8">
     <title>Yescourses · ვიდეოს ატვირთვა</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="/styles.css">
-    <link rel="stylesheet" href="/upload_video.css">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="background"><div id="circles-container"></div></div>
     <header class="uv-header">
         <span class="uv-logo">yescourses</span>
         <nav class="uv-nav">
-            <a href="/admin.html" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
-            <a href="/course.html?pack=basic" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
+            <a href="admin.html" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
+            <a href="course.html?pack=basic" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
         </nav>
     </header>
 
     <main class="uv-main">
-        <h1 class="uv-title">ახალი ვიდეოს ატვირთვა</h1>
-        <p class="uv-subtitle">შეავსე ველები ნაბიჯ-ნაბიჯ. ბოლოს აირჩიე ვიდეო ფაილი და დააჭირე ატვირთვას.</p>
+        <h1 class="uv-title">ვიდეოს ატვირთვა</h1>
+        <p class="uv-subtitle">აირჩიე ფაილი და დააჭირე „ატვირთვა“ — ვიდეო გამოჩნდება კურსის გვერდზე.</p>
 
-        {% with messages = get_flashed_messages(with_categories=true) %}
-        {% if messages %}
-        <div id="upload-message" class="uv-message {{ messages[-1][0] }}">{{ messages[-1][1] }}</div>
-        {% else %}
         <div id="upload-message" class="uv-message" style="display:none;"></div>
-        {% endif %}
-        {% endwith %}
 
         <div class="uv-card">
-            <form id="upload-video-form" class="uv-form" method="post" action="/admin/upload_video" enctype="multipart/form-data">
+            <form id="upload-video-form" class="uv-form">
                 <label>
-                    <span>რომელი პაკეტი?</span>
+                    <span>პაკეტი</span>
                     <select name="pack_id" required>
-                        {% for pack in packs.values() %}
-                        <option value="{{ pack.id }}" {% if pack.id == 'basic' %}selected{% endif %}>{{ pack.name }}</option>
-                        {% endfor %}
+                        <option value="basic">Basic</option>
+                        <option value="plus">Plus</option>
+                        <option value="pro">Pro</option>
                     </select>
-                    <small class="uv-help">ნაგულისხმევად მონიშნულია საწყისი პაკეტი.</small>
                 </label>
                 <label>
                     <span>სათაური</span>
-                    <input type="text" name="title" required placeholder="მაგ: გაკვეთილი 1 - დასაწყისი">
+                    <input type="text" name="title" required placeholder="მაგ: გაკვეთილი 1">
                 </label>
                 <label>
-                    <span>აღწერა</span>
-                    <textarea name="description" rows="3" placeholder="კერძო ინფორმაცია ამ გაკვეთილზე"></textarea>
-                    <small class="uv-help">ეს ველი არასავალდებულოა, მაგრამ სასარგებლოა შიდა ჩანაწერებისთვის.</small>
+                    <span>აღწერა (არასავალდებულო)</span>
+                    <textarea name="description" rows="2" placeholder="აღწერა"></textarea>
                 </label>
                 <label>
-                    <span>კატეგორია / რიგითობა (1 = პირველი ვიდეო)</span>
-                    <select name="order_index" required>
-                        {% for index in range(1, 41) %}
-                        <option value="{{ index }}" {% if index == 1 %}selected{% endif %}>{{ index }}</option>
-                        {% endfor %}
-                    </select>
-                    <small class="uv-help">ნომერი განსაზღვრავს ვიდეოს გამოჩენის თანმიმდევრობას.</small>
+                    <span>რიგითობა</span>
+                    <input type="number" name="order_index" value="1" min="1">
                 </label>
                 <label class="uv-zone" id="upload-zone">
                     <span class="uv-zone-label">ვიდეო ფაილი — გადმოათრიე ან დააჭირე ასარჩევად</span>
@@ -64,7 +50,7 @@
                     <span class="uv-file-name" id="upload-file-name"></span>
                     <input type="file" name="video_file" id="video_file_input" accept="video/*" required>
                 </label>
-                <button type="submit" class="uv-submit">ვიდეოს ატვირთვა</button>
+                <button type="submit" class="uv-submit">ატვირთვა — გადაგიყვანს კურსის გვერდზე</button>
             </form>
         </div>
     </main>
@@ -73,7 +59,7 @@
         © 2026 Yescourses · Admin
     </footer>
 
-    <script src="/main.js"></script>
-    <script src="/upload_video.js"></script>
+    <script src="main.js"></script>
+    <script src="upload_video.js"></script>
 </body>
 </html>
