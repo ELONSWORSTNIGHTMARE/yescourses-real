@@ -4,22 +4,32 @@
     <meta charset="UTF-8">
     <title>Yescourses · Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="{{ url_for('serve_css') }}">
 </head>
 <body>
 <div class="background"><div id="circles-container"></div></div>
 
-<div id="admin-login-view" class="admin-gate">
+{% with messages = get_flashed_messages(with_categories=true) %}
+{% if messages %}
+<div class="flash-container" style="max-width:52rem;margin:1rem auto 0;">
+    {% for category, msg in messages %}
+    <div class="flash-message {{ category }}">{{ msg }}</div>
+    {% endfor %}
+</div>
+{% endif %}
+{% endwith %}
+
+{% if not show_dashboard %}
+<div class="admin-gate">
     <header class="main-header" style="position: relative;">
         <div class="logo">yescourses</div>
-        <nav class="main-nav"><a href="index.html">მთავარი</a></nav>
+        <nav class="main-nav"><a href="{{ url_for('index') }}">მთავარი</a></nav>
     </header>
     <section class="section">
         <h2 class="section-title">ადმინისტრატორის შესვლა</h2>
-        <p class="section-subtitle">მხოლოდ შიდა გუნდისთვის.</p>
-        <div id="admin-auth-message" class="auth-message" style="max-width:24rem;margin:0 auto 1rem;display:none;"></div>
+        <p class="section-subtitle">მხოლოდ შიდა გუნდისთვის (admins / admins).</p>
         <div class="centered-card">
-            <form class="auth-form" id="admin-login-form">
+            <form class="auth-form" method="post" action="{{ url_for('admin_page') }}">
                 <label>მომხმარებელი
                     <input type="text" name="username" required autocomplete="username">
                 </label>
@@ -31,14 +41,14 @@
         </div>
     </section>
 </div>
-
-<div id="admin-dashboard-view" style="display:none;">
+{% else %}
+<div>
     <header class="main-header">
         <div class="logo">yescourses</div>
         <nav class="main-nav">
-            <a href="index.html">მთავარი</a>
+            <a href="{{ url_for('index') }}">მთავარი</a>
             <span class="user-name">Admin panel</span>
-            <button id="admin-logout-btn" class="btn-secondary">გამოსვლა</button>
+            <a href="{{ url_for('admin_logout') }}" class="btn-secondary">გამოსვლა</a>
         </nav>
     </header>
 
@@ -49,33 +59,44 @@
 
             <div class="admin-grid">
                 <div class="admin-card">
-                    <h3>გაყიდვების სტატისტიკა (დემო)</h3>
+                    <h3>გაყიდვების სტატისტიკა</h3>
                     <ul class="stats-list">
-                        <li><span>საწყისი პაკეტი</span><span id="admin-stat-basic" class="stat-count">0 გაყიდვა</span></li>
-                        <li><span>პლუს პაკეტი</span><span id="admin-stat-plus" class="stat-count">0 გაყიდვა</span></li>
-                        <li><span>1-1 Mentorship</span><span id="admin-stat-pro" class="stat-count">0 გაყიდვა</span></li>
+                        <li><span>საწყისი პაკეტი</span><span class="stat-count">{{ stats['basic'] }} გაყიდვა</span></li>
+                        <li><span>პლუს პაკეტი</span><span class="stat-count">{{ stats['plus'] }} გაყიდვა</span></li>
+                        <li><span>1-1 Mentorship</span><span class="stat-count">{{ stats['premium'] }} გაყიდვა</span></li>
                     </ul>
                 </div>
 
                 <div class="admin-card">
                     <h3>ვიდეოს ატვირთვა</h3>
                     <p style="margin-bottom:1rem;color:#9ca3af;">გადადით ატვირთვის გვერდზე და დაამატეთ ახალი ვიდეო მარტივად.</p>
-                    <a href="upload_video.html" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
+                    <a href="{{ url_for('admin_upload_video_page') }}" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
                 </div>
             </div>
 
             <div class="admin-card">
                 <h3>არსებული ვიდეოები</h3>
-                <p style="margin-bottom:0.75rem;"><a href="course.html?pack=basic" class="btn-outline">ნახე კურსის გვერდზე</a></p>
-                <p style="margin-bottom:0.75rem;color:#9ca3af;">აქ შეგიძლია შეცვალო სათაური, პაკეტი, რიგითობა, აღწერა, ან წაშალო ვიდეო.</p>
-                <ul id="admin-videos-list" class="stats-list" style="list-style:none;padding:0;"></ul>
+                <p style="margin-bottom:0.75rem;"><a href="{{ url_for('course', pack_id='basic') }}" class="btn-outline">ნახე კურსის გვერდზე</a></p>
+                <ul class="stats-list" style="list-style:none;padding:0;">
+                    {% if videos %}
+                        {% for video in videos %}
+                        <li style="padding:0.65rem 0;border-bottom:1px solid rgba(148,163,184,0.2);">
+                            <strong>{{ video.title }}</strong>
+                            <div style="color:#9ca3af;font-size:0.9rem;">{{ packs[video.pack_id].name }} · #{{ video.order_index }}</div>
+                        </li>
+                        {% endfor %}
+                    {% else %}
+                        <li style="padding:0.5rem 0;color:#9ca3af;">ვიდეოები ჯერ არ არის ატვირთული.</li>
+                    {% endif %}
+                </ul>
             </div>
         </section>
     </main>
 
     <footer class="main-footer"><p>© 2026 Yescourses · Admin</p></footer>
 </div>
+{% endif %}
 
-<script src="main.js"></script>
+<script src="{{ url_for('serve_js') }}"></script>
 </body>
 </html>

@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Yescourses · კურსი</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="{{ url_for('serve_css') }}">
 </head>
 <body>
 <div class="background"><div id="circles-container"></div></div>
@@ -12,21 +12,63 @@
 <header class="main-header">
     <div class="logo">yescourses</div>
     <nav class="main-nav">
-        <a href="index.html">მთავარი</a>
-        <a href="index.html#pricing">პაკეტები</a>
+        <a href="{{ url_for('index') }}">მთავარი</a>
+        <a href="{{ url_for('index') }}#pricing">პაკეტები</a>
         <a href="#discord">Discord</a>
-        <a href="admin.html" class="btn-secondary">ადმინ პანელი</a>
+        {% if is_admin %}
+        <a href="{{ url_for('admin_page') }}" class="btn-secondary">ადმინ პანელი</a>
+        {% endif %}
     </nav>
 </header>
 
 <main>
     <section class="section course-hero">
-        <h2 id="course-title" class="section-title">შენი კურსის სივრცე — Basic</h2>
+        <h2 class="section-title">შენი კურსის სივრცე — {{ pack.name }}</h2>
         <p class="section-subtitle">აქ გამოჩნდება შენთვის ხელმისაწვდომი ვიდეო გაკვეთილები და მასალები.</p>
+        {% if is_open_testing %}
+        <p class="section-subtitle" style="color:#86efac;">ტესტ რეჟიმი: ეს პაკეტი დროებით ღიაა ყველასთვის.</p>
+        {% endif %}
     </section>
 
+    {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+    <section class="section" style="padding-top:0;">
+        <div class="flash-container">
+            {% for category, msg in messages %}
+            <div class="flash-message {{ category }}">{{ msg }}</div>
+            {% endfor %}
+        </div>
+    </section>
+    {% endif %}
+    {% endwith %}
+
     <section class="section">
-        <div id="videos-list" class="videos-list"></div>
+        <div class="videos-list">
+            {% if videos %}
+                {% for video in videos %}
+                <article class="video-card">
+                    <div class="video-header">
+                        <span class="video-order">#{{ loop.index }}</span>
+                        <h3 class="video-title">{{ video.title }}</h3>
+                    </div>
+                    {% if video.description %}
+                    <p class="video-description">{{ video.description }}</p>
+                    {% endif %}
+                    <div class="video-player-wrapper">
+                        <video class="video-player" controls preload="metadata">
+                            <source src="{{ url_for('uploaded_file', filename=video.filename) }}">
+                            თქვენი ბრაუზერი ვიდეოს არ უჭერს მხარს.
+                        </video>
+                    </div>
+                </article>
+                {% endfor %}
+            {% else %}
+                <article class="video-card">
+                    <div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div>
+                    <p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p>
+                </article>
+            {% endif %}
+        </div>
     </section>
 
     <section id="discord" class="section join-section">
@@ -42,6 +84,6 @@
     <p>© 2026 Yescourses · yestour</p>
 </footer>
 
-<script src="main.js"></script>
+<script src="{{ url_for('serve_js') }}"></script>
 </body>
 </html>

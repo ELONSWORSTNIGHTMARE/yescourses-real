@@ -88,8 +88,8 @@ PACKS = {
     "basic": {
         "id": "basic",
         "name": "საწყისი პაკეტი",
-        "price": 65,
-        "old_price": 90,
+        "price": 99,
+        "old_price": 149,
         "description": [
             "ონლაინ ტუტორიალები",
             "ბილეთების ყიდვა",
@@ -100,9 +100,9 @@ PACKS = {
     },
     "plus": {
         "id": "plus",
-        "name": "სრული მენტორშიპი",
-        "price": 107,
-        "old_price": 190,
+        "name": "პლუს პაკეტი",
+        "price": 249,
+        "old_price": 349,
         "description": [
             "იდეალურია მათთვის, ვინც ნულიდან იწყებს.",
             "კვირაში 2-3 ლექცია",
@@ -113,8 +113,8 @@ PACKS = {
     "premium": {
         "id": "premium",
         "name": "1-1 Mentorship",
-        "price": 400,
-        "old_price": None,
+        "price": 599,
+        "old_price": 799,
         "description": [
             "იდეალურია მათთვის, ვისაც სურს 1-1 სწავლა პირად მენტორთან.",
             "კვირაში ორი Private ლექცია",
@@ -322,27 +322,12 @@ def buy_pack(pack_id):
         flash("ასეთი პაკეტი არ არსებობს.", "error")
         return redirect(url_for("index"))
 
-    user = get_current_user()
-    if not user:
-        flash("პაკეტის შესაძენად გთხოვ, ჯერ დარეგისტრირდი ან შედი ანგარიშზე.", "error")
-        return redirect(url_for("index"))
+    if pack_id == "basic":
+        flash("ტესტ რეჟიმში საწყისი პაკეტი უფასოდ ხელმისაწვდომია.", "info")
+        return redirect(url_for("course", pack_id="basic"))
 
-    if user_has_pack(user["id"], pack_id):
-        flash("ეს პაკეტი უკვე გაქვს შეძენილი.", "info")
-        return redirect(url_for("course", pack_id=pack_id))
-
-    # TODO: connect real bank payment here later.
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "INSERT INTO purchases (user_id, pack_id, purchased_at) VALUES (?, ?, ?)",
-        (user["id"], pack_id, datetime.utcnow().isoformat()),
-    )
-    conn.commit()
-    conn.close()
-
-    flash("გილოცავ! პაკეტი წარმატებით შეიძინე.", "success")
-    return redirect(url_for("course", pack_id=pack_id))
+    flash("ეს შეთავაზება დროებით მიუწვდომელია (Offline).", "info")
+    return redirect(url_for("index"))
 
 
 @app.route("/course/<pack_id>")
@@ -352,14 +337,16 @@ def course(pack_id):
         return redirect(url_for("index"))
 
     user = get_current_user()
-    if not user:
-        flash("კურსზე წვდომისთვის საჭიროა ავტორიზაცია.", "error")
-        return redirect(url_for("index"))
+    is_admin = bool(session.get("is_admin")) or bool(user and user["email"] == ADMIN_EMAIL)
 
-    is_admin = session.get("is_admin") or (user and user.get("email") == ADMIN_EMAIL)
-    if not is_admin and not user_has_pack(user["id"], pack_id):
-        flash("ამ პაკეტზე წვდომა არ გაქვს. გთხოვ, ჯერ შეიძინე.", "error")
-        return redirect(url_for("index"))
+    # Testing mode: basic pack is open so everyone can verify videos.
+    if pack_id != "basic":
+        if not user:
+            flash("კურსზე წვდომისთვის საჭიროა ავტორიზაცია.", "error")
+            return redirect(url_for("index"))
+        if not is_admin and not user_has_pack(user["id"], pack_id):
+            flash("ამ პაკეტზე წვდომა არ გაქვს. გთხოვ, ჯერ შეიძინე.", "error")
+            return redirect(url_for("index"))
 
     conn = get_db()
     cur = conn.cursor()
@@ -377,6 +364,7 @@ def course(pack_id):
         videos=videos,
         user=user,
         is_admin=is_admin,
+        is_open_testing=(pack_id == "basic"),
     )
 
 
@@ -459,7 +447,7 @@ def is_admin_user():
     if session.get("is_admin"):
         return True
     user = get_current_user()
-    return user and user.get("email") == ADMIN_EMAIL
+    return bool(user and user["email"] == ADMIN_EMAIL)
 
 
 def require_admin():
