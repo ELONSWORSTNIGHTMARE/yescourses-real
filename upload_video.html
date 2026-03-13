@@ -4,16 +4,16 @@
     <meta charset="UTF-8">
     <title>Yescourses · ვიდეოს ატვირთვა</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('serve_css') }}">
-    <link rel="stylesheet" href="{{ url_for('serve_upload_video_css') }}">
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="upload_video.css">
 </head>
 <body>
     <div class="background"><div id="circles-container"></div></div>
     <header class="uv-header">
         <span class="uv-logo">yescourses</span>
         <nav class="uv-nav">
-            <a href="{{ url_for('admin_page') }}" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
-            <a href="{{ url_for('course', pack_id='basic') }}" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
+            <a href="admin.html" class="uv-btn uv-btn-outline">← ადმინ პანელი</a>
+            <a href="course.html?pack=basic" class="uv-btn uv-btn-outline">კურსის გვერდი</a>
         </nav>
     </header>
 
@@ -30,7 +30,7 @@
         {% endwith %}
 
         <div class="uv-card">
-            <form id="upload-video-form" class="uv-form" method="post" action="{{ url_for('admin_upload_video') }}" enctype="multipart/form-data">
+            <form id="upload-video-form" class="uv-form" method="post" action="/admin/upload_video" enctype="multipart/form-data">
                 <label>
                     <span>რომელი პაკეტი?</span>
                     <select name="pack_id" required>
@@ -73,7 +73,7 @@
         © 2026 Yescourses · Admin
     </footer>
 
-    <script src="{{ url_for('serve_js') }}"></script>
-    <script src="{{ url_for('serve_upload_video_js') }}"></script>
+    <script src="main.js"></script>
+    <script src="upload_video.js"></script>
 </body>
 </html>

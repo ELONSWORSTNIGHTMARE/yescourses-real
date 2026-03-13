@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <title>Yescourses · Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="{{ url_for('serve_css') }}">
+    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div class="background"><div id="circles-container"></div></div>
@@ -23,7 +23,7 @@
 <div class="admin-gate">
     <header class="main-header" style="position: relative;">
         <div class="logo">yescourses</div>
-        <nav class="main-nav"><a href="{{ url_for('index') }}">მთავარი</a></nav>
+        <nav class="main-nav"><a href="index.html">მთავარი</a></nav>
     </header>
     <section class="section">
         <h2 class="section-title">ადმინისტრატორის შესვლა</h2>
@@ -46,9 +46,9 @@
     <header class="main-header">
         <div class="logo">yescourses</div>
         <nav class="main-nav">
-            <a href="{{ url_for('index') }}">მთავარი</a>
+            <a href="index.html">მთავარი</a>
             <span class="user-name">Admin panel</span>
-            <a href="{{ url_for('admin_logout') }}" class="btn-secondary">გამოსვლა</a>
+            <a href="/admin/logout" class="btn-secondary">გამოსვლა</a>
         </nav>
     </header>
 
@@ -70,13 +70,13 @@
                 <div class="admin-card">
                     <h3>ვიდეოს ატვირთვა</h3>
                     <p style="margin-bottom:1rem;color:#9ca3af;">გადადით ატვირთვის გვერდზე და დაამატეთ ახალი ვიდეო მარტივად.</p>
-                    <a href="{{ url_for('admin_upload_video_page') }}" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
+                    <a href="upload_video.html" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
                 </div>
             </div>
 
             <div class="admin-card">
                 <h3>არსებული ვიდეოები</h3>
-                <p style="margin-bottom:0.75rem;"><a href="{{ url_for('course', pack_id='basic') }}" class="btn-outline">ნახე კურსის გვერდზე</a></p>
+                <p style="margin-bottom:0.75rem;"><a href="course.html?pack=basic" class="btn-outline">ნახე კურსის გვერდზე</a></p>
                 <ul class="stats-list" style="list-style:none;padding:0;">
                     {% if videos %}
                         {% for video in videos %}
@@ -97,6 +97,6 @@
 </div>
 {% endif %}
 
-<script src="{{ url_for('serve_js') }}"></script>
+<script src="main.js"></script>
 </body>
 </html>
