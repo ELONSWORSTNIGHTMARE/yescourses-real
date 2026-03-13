@@ -23,13 +23,13 @@
         <div id="upload-message" class="uv-message" style="display:none;"></div>
 
         <div class="uv-card">
-            <form id="upload-video-form" class="uv-form">
+            <form id="upload-video-form" class="uv-form" method="post" action="/admin/upload_video" enctype="multipart/form-data">
                 <label>
                     <span>პაკეტი</span>
                     <select name="pack_id" required>
-                        <option value="basic">Basic</option>
-                        <option value="plus">Plus</option>
-                        <option value="pro">Pro</option>
+                        <option value="basic">საწყისი პაკეტი</option>
+                        <option value="plus">სრული მენტორშიპი</option>
+                        <option value="premium">1-1 Mentorship</option>
                     </select>
                 </label>
                 <label>

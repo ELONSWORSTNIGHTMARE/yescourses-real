@@ -518,57 +518,49 @@
         if (!list) return;
 
         var params = new URLSearchParams(window.location.search);
-        var pack = params.get("pack") || "basic";
+        var pathMatch = window.location.pathname.match(/\/course\/([^/?#]+)/);
+        var pathPack = pathMatch && pathMatch[1] ? decodeURIComponent(pathMatch[1]) : "";
+        var pack = pathPack || params.get("pack") || "basic";
         var account = getCurrentAccount();
         if (!account) {
             window.location.href = "index.html";
             return;
         }
-        // Temporary testing mode: any logged-in user can open course videos.
-        // Later we can re-enable purchase gating here with userHasPack(account, pack).
 
-        var packNames = { basic: "საწყისი პაკეტი", plus: "სრული მენტორშიპი", pro: "1-1 Mentorship" };
+        var packNames = {
+            basic: "საწყისი პაკეტი",
+            plus: "სრული მენტორშიპი",
+            premium: "1-1 Mentorship",
+            pro: "1-1 Mentorship"
+        };
         var title = document.getElementById("course-title");
         if (title) title.textContent = "შენი კურსის სივრცე — " + (packNames[pack] || "საწყისი პაკეტი");
 
-        var videos = getVideos();
-        var filtered = videos.filter(function (v) { return v.pack_id === pack; });
-        filtered.sort(function (a, b) {
-            return Number(a.order_index || 0) - Number(b.order_index || 0);
-        });
-
-        if (!filtered.length) {
-            list.innerHTML = '<article class="video-card"><div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div><p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p></article>';
-            return;
-        }
-
-        list.innerHTML = filtered.map(function (v, i) {
-            return [
-                '<article class="video-card">',
-                '<div class="video-header"><span class="video-order">#' + (i + 1) + '</span><h3 class="video-title">' + escapeHtml(v.title) + '</h3></div>',
-                v.description ? '<p class="video-description">' + escapeHtml(v.description) + '</p>' : "",
-                '<div class="video-player-wrapper"><video class="video-player" data-blob-id="' + escapeHtml(v.blob_id || "") + '" data-fallback-url="' + escapeHtml(v.url || "") + '" controls preload="metadata">თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>',
-                '</article>'
-            ].join("");
-        }).join("");
-
-        list.querySelectorAll(".video-player").forEach(function (video) {
-            var blobId = video.getAttribute("data-blob-id");
-            var fallbackUrl = video.getAttribute("data-fallback-url");
-            if (!blobId) {
-                if (fallbackUrl) video.src = fallbackUrl;
-                return;
-            }
-            getVideoBlob(blobId).then(function (blob) {
-                if (blob) {
-                    video.src = URL.createObjectURL(blob);
+        fetch("/api/videos/" + encodeURIComponent(pack), { credentials: "same-origin" })
+            .then(function (res) {
+                if (!res.ok) throw new Error("failed");
+                return res.json();
+            })
+            .then(function (data) {
+                var serverVideos = Array.isArray(data.videos) ? data.videos : [];
+                if (!serverVideos.length) {
+                    list.innerHTML = '<article class="video-card"><div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div><p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p></article>';
                     return;
                 }
-                if (fallbackUrl) video.src = fallbackUrl;
-            }).catch(function () {
-                if (fallbackUrl) video.src = fallbackUrl;
+
+                list.innerHTML = serverVideos.map(function (v, i) {
+                    return [
+                        '<article class="video-card">',
+                        '<div class="video-header"><span class="video-order">#' + (i + 1) + '</span><h3 class="video-title">' + escapeHtml(v.title) + '</h3></div>',
+                        v.description ? '<p class="video-description">' + escapeHtml(v.description) + '</p>' : "",
+                        '<div class="video-player-wrapper"><video class="video-player" src="' + escapeHtml(v.url || "") + '" controls preload="metadata">თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>',
+                        '</article>'
+                    ].join("");
+                }).join("");
+            })
+            .catch(function () {
+                list.innerHTML = '<article class="video-card"><div class="video-header"><h3 class="video-title">ვიდეოების ჩატვირთვა ვერ მოხერხდა</h3></div><p class="video-description">გთხოვ სცადო გვერდის გადატვირთვა.</p></article>';
             });
-        });
     }
 
     function initAdminPage() {
