@@ -524,15 +524,12 @@
             window.location.href = "index.html";
             return;
         }
-        if (!userHasPack(account, pack)) {
-            alert("ამ კურსზე წვდომა არ გაქვს. ჯერ შეიძინე შესაბამისი პაკეტი.");
-            window.location.href = "index.html";
-            return;
-        }
+        // Temporary testing mode: any logged-in user can open course videos.
+        // Later we can re-enable purchase gating here with userHasPack(account, pack).
 
-        var packNames = { basic: "Basic", plus: "Plus", pro: "Pro" };
+        var packNames = { basic: "საწყისი პაკეტი", plus: "სრული მენტორშიპი", pro: "1-1 Mentorship" };
         var title = document.getElementById("course-title");
-        if (title) title.textContent = "შენი კურსის სივრცე — " + (packNames[pack] || "Basic");
+        if (title) title.textContent = "შენი კურსის სივრცე — " + (packNames[pack] || "საწყისი პაკეტი");
 
         var videos = getVideos();
         var filtered = videos.filter(function (v) { return v.pack_id === pack; });
