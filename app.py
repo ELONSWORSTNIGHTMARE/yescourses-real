@@ -239,7 +239,8 @@ def redirect_old_admin():
 
 @app.route("/course.html")
 def redirect_old_course():
-    return redirect(url_for("index"))
+    pack_id = request.args.get("pack", "basic")
+    return course(pack_id)
 
 
 @app.route("/")
