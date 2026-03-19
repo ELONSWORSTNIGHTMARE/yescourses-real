@@ -104,7 +104,7 @@
     function ensureSystemAccounts() {
         var accounts = getAccounts();
         var systemEmail = "matebedeladze@gmail.com";
-        var requiredPacks = ["basic", "plus", "pro"];
+        var requiredPacks = ["basic", "plus", "premium"];
         var existing = accounts.find(function (a) { return a.email === systemEmail; });
 
         if (existing) {
@@ -500,7 +500,7 @@
                 }
 
                 if (userHasPack(current, pack)) {
-                    window.location.href = "course.html?pack=" + encodeURIComponent(pack);
+                    window.location.href = "/course/" + encodeURIComponent(pack);
                     return;
                 }
 
@@ -508,47 +508,103 @@
                 if (!ok) return;
                 purchasePack(pack);
                 initPricingActions();
-                window.location.href = "course.html?pack=" + encodeURIComponent(pack);
+                window.location.href = "/course/" + encodeURIComponent(pack);
             });
         });
+    }
+
+    function renderCourseVideosFromServer(list, payload) {
+        var title = document.getElementById("course-title");
+        if (title) title.textContent = payload.pack_name || "კურსი";
+        var videos = payload.videos || [];
+        if (!videos.length) {
+            list.innerHTML =
+                '<article class="video-card"><div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div></article>';
+            return;
+        }
+        list.innerHTML = videos
+            .map(function (v, i) {
+                var src = v.src || "";
+                return [
+                    '<article class="video-card">',
+                    '<div class="video-header"><span class="video-order">#' +
+                        (i + 1) +
+                        '</span><h3 class="video-title">' +
+                        escapeHtml(v.title) +
+                        "</h3></div>",
+                    v.description
+                        ? '<p class="video-description">' + escapeHtml(v.description) + "</p>"
+                        : "",
+                    '<div class="video-player-wrapper"><video class="video-player" controls preload="metadata" src="' +
+                        escapeHtml(src) +
+                        '">თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>',
+                    "</article>",
+                ].join("");
+            })
+            .join("");
     }
 
     function initCoursePage() {
         var list = document.getElementById("videos-list");
         if (!list) return;
 
-        var params = new URLSearchParams(window.location.search);
-        var pack = params.get("pack") || "basic";
-        var account = getCurrentAccount();
-        if (!account) {
-            window.location.href = "index.html";
+        var payload = window.__COURSE_PAYLOAD__;
+        if (payload && typeof payload === "object" && Array.isArray(payload.videos)) {
+            renderCourseVideosFromServer(list, payload);
             return;
         }
 
-        var packNames = { basic: "საწყისი პაკეტი", plus: "სრული მენტორშიპი", pro: "1-1 Mentorship" };
+        var params = new URLSearchParams(window.location.search);
+        var pathMatch = window.location.pathname.match(/\/course\/([^/]+)\/?$/);
+        var pack = pathMatch ? decodeURIComponent(pathMatch[1]) : params.get("pack") || "basic";
+        var account = getCurrentAccount();
+        if (!account) {
+            window.location.href = "/";
+            return;
+        }
+
+        var packNames = {
+            basic: "საწყისი პაკეტი",
+            plus: "სრული მენტორშიპი",
+            premium: "1-1 Mentorship",
+            pro: "1-1 Mentorship",
+        };
         var title = document.getElementById("course-title");
         if (title) title.textContent = "შენი კურსის სივრცე — " + (packNames[pack] || "საწყისი პაკეტი");
 
         var videos = getVideos();
-        var filtered = videos.filter(function (v) { return v.pack_id === pack; });
+        var filtered = videos.filter(function (v) {
+            return v.pack_id === pack;
+        });
         filtered.sort(function (a, b) {
             return Number(a.order_index || 0) - Number(b.order_index || 0);
         });
 
         if (!filtered.length) {
-            list.innerHTML = '<article class="video-card"><div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div><p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p></article>';
+            list.innerHTML =
+                '<article class="video-card"><div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div><p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p></article>';
             return;
         }
 
-        list.innerHTML = filtered.map(function (v, i) {
-            return [
-                '<article class="video-card">',
-                '<div class="video-header"><span class="video-order">#' + (i + 1) + '</span><h3 class="video-title">' + escapeHtml(v.title) + '</h3></div>',
-                v.description ? '<p class="video-description">' + escapeHtml(v.description) + '</p>' : "",
-                '<div class="video-player-wrapper"><video class="video-player" data-blob-id="' + escapeHtml(v.blob_id || "") + '" data-fallback-url="' + escapeHtml(v.url || "") + '" controls preload="metadata">თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>',
-                '</article>'
-            ].join("");
-        }).join("");
+        list.innerHTML = filtered
+            .map(function (v, i) {
+                return [
+                    '<article class="video-card">',
+                    '<div class="video-header"><span class="video-order">#' +
+                        (i + 1) +
+                        '</span><h3 class="video-title">' +
+                        escapeHtml(v.title) +
+                        "</h3></div>",
+                    v.description ? '<p class="video-description">' + escapeHtml(v.description) + "</p>" : "",
+                    '<div class="video-player-wrapper"><video class="video-player" data-blob-id="' +
+                        escapeHtml(v.blob_id || "") +
+                        '" data-fallback-url="' +
+                        escapeHtml(v.url || "") +
+                        '" controls preload="metadata">თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>',
+                    "</article>",
+                ].join("");
+            })
+            .join("");
 
         list.querySelectorAll(".video-player").forEach(function (video) {
             var blobId = video.getAttribute("data-blob-id");
@@ -582,14 +638,140 @@
         var statPlus = document.getElementById("admin-stat-plus");
         var statPro = document.getElementById("admin-stat-pro");
 
+        var serverPayload = window.__ADMIN_PAYLOAD__;
+        var useServerAdmin =
+            serverPayload != null &&
+            typeof serverPayload === "object" &&
+            Object.prototype.hasOwnProperty.call(serverPayload, "showDashboard");
+
+        function paintServerSalesStats(stats) {
+            stats = stats || {};
+            if (statBasic) statBasic.textContent = (Number(stats.basic) || 0) + " გაყიდვა";
+            if (statPlus) statPlus.textContent = (Number(stats.plus) || 0) + " გაყიდვა";
+            if (statPro) statPro.textContent = (Number(stats.premium) || 0) + " გაყიდვა";
+        }
+
+        function packSelectHtml(selectedPack) {
+            var packs = [
+                { id: "basic", label: "საწყისი" },
+                { id: "plus", label: "Plus" },
+                { id: "premium", label: "Premium" },
+            ];
+            return packs
+                .map(function (p) {
+                    return (
+                        '<option value="' +
+                        escapeHtml(p.id) +
+                        '"' +
+                        (p.id === selectedPack ? " selected" : "") +
+                        ">" +
+                        escapeHtml(p.label) +
+                        "</option>"
+                    );
+                })
+                .join("");
+        }
+
+        function paintServerVideoList(videos) {
+            if (!list) return;
+            if (!videos || !videos.length) {
+                list.innerHTML =
+                    '<li style="padding:0.5rem 0;color:#9ca3af;">ვიდეოები ჯერ არ არის ატვირთული.</li>';
+                return;
+            }
+            list.innerHTML = videos
+                .map(function (v) {
+                    var idAttr = escapeHtml(String(v.id));
+                    var safeTitle = escapeHtml(v.title || "");
+                    var safeDesc = escapeHtml(v.description || "");
+                    var order = Number(v.order_index || 1);
+                    var fn = escapeHtml(v.filename || "");
+                    var pk = v.pack_id || "basic";
+                    return [
+                        '<li style="padding:0.8rem 0;border-bottom:1px solid rgba(148,163,184,0.2);">',
+                        '<p style="font-size:0.75rem;color:#9ca3af;margin:0 0 0.5rem;word-break:break-all;">ფაილი: ',
+                        fn,
+                        "</p>",
+                        '<form method="post" action="/admin/update_video/',
+                        idAttr,
+                        '" style="margin-bottom:0.5rem;">',
+                        '<div style="display:grid;grid-template-columns:2fr 1fr 100px;gap:0.6rem;margin-bottom:0.6rem;">',
+                        '<input type="text" name="title" required value="' +
+                            safeTitle +
+                            '" placeholder="სათაური">',
+                        "<select name=\"pack_id\">" + packSelectHtml(pk) + "</select>",
+                        '<input type="number" name="order_index" min="1" value="' +
+                            order +
+                            '">',
+                        "</div>",
+                        '<textarea name="description" rows="2" placeholder="აღწერა" style="width:100%;margin-bottom:0.6rem;">',
+                        safeDesc,
+                        "</textarea>",
+                        '<button type="submit" class="btn-primary">შენახვა</button>',
+                        "</form>",
+                        '<form method="post" action="/admin/delete_video/',
+                        idAttr,
+                        '" style="display:inline-block;margin-left:0.5rem;" onsubmit="return confirm(\'წავშალოთ ეს ვიდეო?\');">',
+                        '<button type="submit" class="btn-secondary">წაშლა</button>',
+                        "</form>",
+                        "</li>",
+                    ].join("");
+                })
+                .join("");
+        }
+
+        if (useServerAdmin) {
+            loginView.style.display = serverPayload.showDashboard ? "none" : "block";
+            dashView.style.display = serverPayload.showDashboard ? "block" : "none";
+            var flashBox = document.getElementById("admin-server-flash");
+            if (
+                flashBox &&
+                serverPayload.flashes &&
+                serverPayload.flashes.length
+            ) {
+                flashBox.style.display = "block";
+                flashBox.innerHTML = serverPayload.flashes
+                    .map(function (f) {
+                        var cat = (f.category || "").toString();
+                        var cls =
+                            cat === "error"
+                                ? "error"
+                                : cat === "success"
+                                  ? "success"
+                                  : "info";
+                        return (
+                            '<p class="auth-message ' +
+                            cls +
+                            '" style="margin:0.35rem 0;padding:0.5rem 0.75rem;border-radius:0.5rem;">' +
+                            escapeHtml(f.message) +
+                            "</p>"
+                        );
+                    })
+                    .join("");
+            }
+            if (serverPayload.showDashboard) {
+                paintServerSalesStats(serverPayload.stats);
+                paintServerVideoList(serverPayload.videos);
+            }
+            if (logoutBtn) {
+                logoutBtn.addEventListener("click", function () {
+                    localStorage.removeItem(STORAGE_ADMIN);
+                    window.location.href = "/admin/logout";
+                });
+            }
+            return;
+        }
+
         function paintSalesStats() {
             var accounts = getAccounts();
             var basic = accounts.filter(function (a) { return userHasPack(a, "basic"); }).length;
             var plus = accounts.filter(function (a) { return userHasPack(a, "plus"); }).length;
-            var pro = accounts.filter(function (a) { return userHasPack(a, "pro"); }).length;
+            var premium = accounts.filter(function (a) {
+                return userHasPack(a, "premium") || userHasPack(a, "pro");
+            }).length;
             if (statBasic) statBasic.textContent = basic + " გაყიდვა";
             if (statPlus) statPlus.textContent = plus + " გაყიდვა";
-            if (statPro) statPro.textContent = pro + " გაყიდვა";
+            if (statPro) statPro.textContent = premium + " გაყიდვა";
         }
 
         function normalizeVideoOrder() {
@@ -638,7 +820,7 @@
                     '<li style="padding:0.8rem 0;border-bottom:1px solid rgba(148,163,184,0.2);" data-row-id="' + id + '">',
                     '<div style="display:grid;grid-template-columns:2fr 1fr 100px;gap:0.6rem;margin-bottom:0.6rem;">',
                     '<input type="text" class="admin-video-title" value="' + safeTitle + '" placeholder="სათაური">',
-                    '<select class="admin-video-pack"><option value="basic">Basic</option><option value="plus">Plus</option><option value="pro">Pro</option></select>',
+                    '<select class="admin-video-pack"><option value="basic">Basic</option><option value="plus">Plus</option><option value="premium">Premium</option></select>',
                     '<input type="number" class="admin-video-order" min="1" value="' + order + '">',
                     '</div>',
                     '<textarea class="admin-video-desc" rows="2" placeholder="აღწერა" style="width:100%;margin-bottom:0.6rem;">' + safeDesc + '</textarea>',
@@ -710,9 +892,7 @@
         }
 
         function paintAdmin() {
-            // Prefer server session state if available (so admin uploads work).
-            var serverAdmin = document.body && document.body.getAttribute("data-server-admin") === "1";
-            var isAdmin = serverAdmin || localStorage.getItem(STORAGE_ADMIN) === "1";
+            var isAdmin = localStorage.getItem(STORAGE_ADMIN) === "1";
             loginView.style.display = isAdmin ? "none" : "block";
             dashView.style.display = isAdmin ? "block" : "none";
             if (isAdmin) {

@@ -4,24 +4,30 @@
     <meta charset="UTF-8">
     <title>Yescourses · Admin</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
 </head>
-<body data-server-admin="{{ '1' if show_dashboard else '0' }}">
+<body>
+<script>
+window.__ADMIN_PAYLOAD__ = null; /*__ADMIN_INJECT__*/
+</script>
+
 <div class="background"><div id="circles-container"></div></div>
 
-<div id="admin-login-view" class="admin-gate"{% if show_dashboard %} style="display:none;"{% endif %}>
+<div id="admin-server-flash" class="auth-message" style="display:none;max-width:40rem;margin:0.75rem auto;padding:0 1rem;"></div>
+
+<div id="admin-login-view" class="admin-gate">
     <header class="main-header" style="position: relative;">
         <div class="logo">yescourses</div>
         <nav class="main-nav"><a href="/">მთავარი</a></nav>
     </header>
     <section class="section">
         <h2 class="section-title">ადმინისტრატორის შესვლა</h2>
-        <p class="section-subtitle">მხოლოდ შიდა გუნდისთვის.</p>
+        <p class="section-subtitle">შედი საიტზე ანგარიშით (<span style="word-break:break-all;">matebedeladze@gmail.com</span>) ან გამოიყენე ქვემოთ მოცემული შიდა ანგარიში.</p>
         <div id="admin-auth-message" class="auth-message" style="max-width:24rem;margin:0 auto 1rem;display:none;"></div>
         <div class="centered-card">
             <form class="auth-form" id="admin-login-form" method="post" action="/admin">
                 <label>მომხმარებელი
-                    <input type="text" name="username" required autocomplete="username">
+                    <input type="text" name="username" required autocomplete="username" placeholder="admin">
                 </label>
                 <label>პაროლი
                     <input type="password" name="password" required autocomplete="current-password">
@@ -32,42 +38,42 @@
     </section>
 </div>
 
-<div id="admin-dashboard-view"{% if not show_dashboard %} style="display:none;"{% endif %}>
+<div id="admin-dashboard-view" style="display:none;">
     <header class="main-header">
         <div class="logo">yescourses</div>
         <nav class="main-nav">
             <a href="/">მთავარი</a>
             <span class="user-name">Admin panel</span>
-            <button id="admin-logout-btn" class="btn-secondary">გამოსვლა</button>
+            <button id="admin-logout-btn" type="button" class="btn-secondary">გამოსვლა</button>
         </nav>
     </header>
 
     <main>
         <section class="section">
             <h2 class="section-title">ადმინისტრატორის პანელი</h2>
-            <p class="section-subtitle">გაყიდვები და ვიდეოების მართვა.</p>
+            <p class="section-subtitle">გაყიდვები და ვიდეოების მართვა (სერვერის მონაცემები).</p>
 
             <div class="admin-grid">
                 <div class="admin-card">
-                    <h3>გაყიდვების სტატისტიკა (დემო)</h3>
+                    <h3>გაყიდვების სტატისტიკა</h3>
                     <ul class="stats-list">
                         <li><span>Basic</span><span id="admin-stat-basic" class="stat-count">0 გაყიდვა</span></li>
                         <li><span>Plus</span><span id="admin-stat-plus" class="stat-count">0 გაყიდვა</span></li>
-                        <li><span>Pro</span><span id="admin-stat-pro" class="stat-count">0 გაყიდვა</span></li>
+                        <li><span>Premium</span><span id="admin-stat-pro" class="stat-count">0 გაყიდვა</span></li>
                     </ul>
                 </div>
 
                 <div class="admin-card">
                     <h3>ვიდეოს ატვირთვა</h3>
-                    <p style="margin-bottom:1rem;color:#9ca3af;">გადადით ატვირთვის გვერდზე და დაამატეთ ახალი ვიდეო.</p>
+                    <p style="margin-bottom:1rem;color:#9ca3af;">ატვირთე ვიდეო — ის გამოჩნდება შესაბამისი პაკეტის კურსის გვერდზე.</p>
                     <a href="/upload_video.html" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
                 </div>
             </div>
 
             <div class="admin-card">
                 <h3>არსებული ვიდეოები</h3>
-                <p style="margin-bottom:0.75rem;"><a href="/course.html?pack=basic" class="btn-outline">ნახე კურსის გვერდზე</a></p>
-                <p style="margin-bottom:0.75rem;color:#9ca3af;">აქ შეგიძლია შეცვალო სათაური, პაკეტი, რიგითობა, აღწერა, ან წაშალო ვიდეო.</p>
+                <p style="margin-bottom:0.75rem;"><a href="/course/basic" class="btn-outline">ნახე კურსის გვერდზე</a></p>
+                <p style="margin-bottom:0.75rem;color:#9ca3af;">შეცვალე სათაური, პაკეტი, რიგითობა, აღწერა; წაშლა სერვერზე მოხდება.</p>
                 <ul id="admin-videos-list" class="stats-list" style="list-style:none;padding:0;"></ul>
             </div>
         </section>
@@ -76,6 +82,6 @@
     <footer class="main-footer"><p>© 2026 Yescourses · Admin</p></footer>
 </div>
 
-<script src="main.js"></script>
+<script src="/main.js"></script>
 </body>
 </html>

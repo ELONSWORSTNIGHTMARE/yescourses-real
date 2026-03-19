@@ -4,9 +4,14 @@
     <meta charset="UTF-8">
     <title>Yescourses · კურსი</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
+<script>
+/* Filled by Flask when served from the app; stays null for static preview / local demo */
+window.__COURSE_PAYLOAD__ = null; /*__YES_COURSES_INJECT__*/
+</script>
+
 <div class="background"><div id="circles-container"></div></div>
 
 <header class="main-header">
@@ -20,34 +25,11 @@
 
 <main>
     <section class="section course-hero">
-        <h2 class="section-title">{{ pack.name }}</h2>
+        <h2 id="course-title" class="section-title">კურსი</h2>
     </section>
 
     <section class="section">
-        <div class="videos-list">
-            {% if videos %}
-                {% for video in videos %}
-                <article class="video-card">
-                    <div class="video-header">
-                        <span class="video-order">#{{ loop.index }}</span>
-                        <h3 class="video-title">{{ video.title }}</h3>
-                    </div>
-                    {% if video.description %}
-                    <p class="video-description">{{ video.description }}</p>
-                    {% endif %}
-                    <div class="video-player-wrapper">
-                        <video class="video-player" controls preload="metadata">
-                            <source src="{{ url_for('uploaded_file', filename=video.filename) }}">
-                        </video>
-                    </div>
-                </article>
-                {% endfor %}
-            {% else %}
-                <article class="video-card">
-                    <div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div>
-                </article>
-            {% endif %}
-        </div>
+        <div id="videos-list" class="videos-list"></div>
     </section>
 </main>
 
@@ -55,6 +37,6 @@
     <p>© 2026 Yescourses</p>
 </footer>
 
-<script src="main.js"></script>
+<script src="/main.js"></script>
 </body>
 </html>

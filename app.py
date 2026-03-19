@@ -1,7 +1,19 @@
-from flask import Flask, render_template, request, redirect, url_for, session, flash, send_from_directory, Response
+from flask import (
+    Flask,
+    Response,
+    flash,
+    get_flashed_messages,
+    redirect,
+    render_template,
+    request,
+    send_from_directory,
+    session,
+    url_for,
+)
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
+import json
 import os
 import sqlite3
 from datetime import datetime
@@ -32,6 +44,11 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
+
+# Admin: panel login + site user that may upload / manage videos
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "yestour111"
+ADMIN_EMAIL = "matebedeladze@gmail.com"
 
 
 @app.route("/styles.css")
@@ -126,6 +143,76 @@ PACKS = {
 }
 
 
+def render_course_html_response(pack_id, videos_rows):
+    """Serve course.html with embedded JSON (no Jinja in file — avoids raw {{ }} on static hosts)."""
+    payload = {
+        "pack_id": pack_id,
+        "pack_name": PACKS[pack_id]["name"],
+        "videos": [
+            {
+                "title": row["title"],
+                "description": (row["description"] or ""),
+                "src": url_for("uploaded_file", filename=row["filename"]),
+            }
+            for row in videos_rows
+        ],
+    }
+    path = os.path.join(BASE_DIR, "course.html")
+    with open(path, encoding="utf-8") as f:
+        html = f.read()
+    payload_js = json.dumps(payload, ensure_ascii=False)
+    # Safe inside <script>: avoid closing the script tag from user content
+    payload_js = payload_js.replace("<", "\\u003c")
+    marker = "window.__COURSE_PAYLOAD__ = null; /*__YES_COURSES_INJECT__*/"
+    injected = f"window.__COURSE_PAYLOAD__ = {payload_js}; /*__YES_COURSES_INJECT__*/"
+    if marker not in html:
+        raise RuntimeError("course.html is missing __YES_COURSES_INJECT__ marker")
+    html = html.replace(marker, injected, 1)
+    return Response(html, mimetype="text/html; charset=utf-8")
+
+
+def admin_videos_to_json(videos_rows):
+    return [
+        {
+            "id": int(row["id"]),
+            "title": row["title"],
+            "description": row["description"] or "",
+            "pack_id": row["pack_id"],
+            "order_index": int(row["order_index"] or 1),
+            "filename": row["filename"],
+        }
+        for row in videos_rows
+    ]
+
+
+def build_admin_payload(show_dashboard, stats, videos_json_list):
+    flashes = get_flashed_messages(with_categories=True)
+    return {
+        "showDashboard": bool(show_dashboard),
+        "stats": stats or {},
+        "videos": videos_json_list or [],
+        "flashes": [
+            {"category": str(cat or "message"), "message": str(msg or "")}
+            for cat, msg in flashes
+        ],
+    }
+
+
+def render_admin_html_response(payload_dict):
+    """admin.html without Jinja — payload drives dashboard (same pattern as course page)."""
+    path = os.path.join(BASE_DIR, "admin.html")
+    with open(path, encoding="utf-8") as f:
+        html = f.read()
+    payload_js = json.dumps(payload_dict, ensure_ascii=False)
+    payload_js = payload_js.replace("<", "\\u003c")
+    marker = "window.__ADMIN_PAYLOAD__ = null; /*__ADMIN_INJECT__*/"
+    injected = f"window.__ADMIN_PAYLOAD__ = {payload_js}; /*__ADMIN_INJECT__*/"
+    if marker not in html:
+        raise RuntimeError("admin.html is missing __ADMIN_INJECT__ marker")
+    html = html.replace(marker, injected, 1)
+    return Response(html, mimetype="text/html; charset=utf-8")
+
+
 def get_db():
     conn = sqlite3.connect(DB_PATH)
     conn.row_factory = sqlite3.Row
@@ -176,8 +263,8 @@ def init_db():
 
     conn.commit()
 
-    # Ensure admin user can always log in (matebedeladze@gmail.com / Matebedeladze1)
-    cur.execute("SELECT id FROM users WHERE email = ?", ("matebedeladze@gmail.com",))
+    # Ensure admin user can always log in (ADMIN_EMAIL / Matebedeladze1)
+    cur.execute("SELECT id FROM users WHERE email = ?", (ADMIN_EMAIL,))
     if cur.fetchone() is None:
         cur.execute(
             """
@@ -185,7 +272,7 @@ def init_db():
             VALUES (?, ?, ?, ?)
             """,
             (
-                "matebedeladze@gmail.com",
+                ADMIN_EMAIL,
                 "Admin",
                 generate_password_hash("Matebedeladze1"),
                 datetime.utcnow().isoformat(),
@@ -284,6 +371,8 @@ def register():
     user = cur.fetchone()
     conn.close()
     session["user_id"] = user["id"]
+    if email.lower() == ADMIN_EMAIL.lower():
+        session["is_admin"] = True
     flash("რეგისტრაცია წარმატებით დასრულდა!", "success")
     return redirect(request.referrer or url_for("index"))
 
@@ -304,10 +393,16 @@ def login():
         return redirect(request.referrer or url_for("index"))
 
     session["user_id"] = user["id"]
-    if user["email"] == "matebedeladze@gmail.com":
+    user_email = (user["email"] or "").lower()
+    if user_email == ADMIN_EMAIL.lower():
         session["is_admin"] = True
-    flash("შესვლა წარმატებულია! შენ ადმინი ხარ — შეგიძლია ვიდეოს ატვირთვა კურსის გვერდიდან.", "success")
-    return redirect(url_for("index"))
+        flash(
+            "შესვლა წარმატებულია! ადმინისტრატორად ხარ — შეგიძლია ვიდეოების ატვირთვა.",
+            "success",
+        )
+    else:
+        flash("შესვლა წარმატებულია!", "success")
+    return redirect(request.referrer or url_for("index"))
 
 
 @app.route("/logout")
@@ -356,8 +451,6 @@ def course(pack_id):
         flash("კურსზე წვდომისთვის საჭიროა ავტორიზაცია.", "error")
         return redirect(url_for("index"))
 
-    is_admin = session.get("is_admin") or (user and user.get("email") == ADMIN_EMAIL)
-
     conn = get_db()
     cur = conn.cursor()
     cur.execute(
@@ -367,14 +460,7 @@ def course(pack_id):
     videos = cur.fetchall()
     conn.close()
 
-    return render_template(
-        "course.html",
-        pack=PACKS[pack_id],
-        pack_id=pack_id,
-        videos=videos,
-        user=user,
-        is_admin=is_admin,
-    )
+    return render_course_html_response(pack_id, videos)
 
 
 @app.route("/course/<pack_id>/upload", methods=["POST"])
@@ -447,16 +533,9 @@ def course_upload_video(pack_id):
     return redirect(url_for("course", pack_id=pack_id))
 
 
-ADMIN_USERNAME = "admin"
-ADMIN_PASSWORD = "yestour111"
-ADMIN_EMAIL = "matebedeladze@gmail.com"
-
-
 def is_admin_user():
-    if session.get("is_admin"):
-        return True
-    user = get_current_user()
-    return user and user.get("email") == ADMIN_EMAIL
+    """Admin capability is session-only so /admin/logout can revoke access."""
+    return bool(session.get("is_admin"))
 
 
 def require_admin():
@@ -495,17 +574,16 @@ def admin_page():
         flash("არასწორი მომხმარებელი ან პაროლი.", "error")
         return redirect(url_for("admin_page"))
 
-    if session.get("is_admin"):
+    if is_admin_user():
         data = get_admin_data()
-        return render_template(
-            "admin.html",
-            packs=PACKS,
-            stats=data["stats"],
-            videos=data["videos"],
-            show_dashboard=True,
+        payload = build_admin_payload(
+            True,
+            data["stats"],
+            admin_videos_to_json(data["videos"]),
         )
+        return render_admin_html_response(payload)
 
-    return render_template("admin.html", show_dashboard=False)
+    return render_admin_html_response(build_admin_payload(False, {}, []))
 
 
 @app.errorhandler(RequestEntityTooLarge)
@@ -516,8 +594,8 @@ def handle_large_upload(e):
 
 @app.route("/upload_video.html")
 def upload_video_page():
-    if not session.get("is_admin"):
-        flash("ადმინისტრატორის შესვლა საჭიროა.", "error")
+    if not is_admin_user():
+        flash("ადმინისტრატორის შესვლა საჭიროა (საიტზე შესვლა ან ადმინ პანელი).", "error")
         return redirect(url_for("admin_page"))
     return render_template("upload_video.html", packs=PACKS)
 
@@ -595,6 +673,49 @@ def admin_upload_video():
 
     flash("ვიდეო წარმატებით აიტვირთა.", "success")
     return redirect(url_for("course", pack_id=pack_id))
+
+
+@app.route("/admin/update_video/<int:video_id>", methods=["POST"])
+def admin_update_video(video_id):
+    if not require_admin():
+        return redirect(url_for("admin_page"))
+
+    pack_id = request.form.get("pack_id", "").strip()
+    title = request.form.get("title", "").strip()
+    description = request.form.get("description", "").strip()
+    order_index = request.form.get("order_index", "1")
+
+    if pack_id not in PACKS:
+        flash("არასწორი პაკეტი.", "error")
+        return redirect(url_for("admin_page"))
+    if not title:
+        flash("სათაური სავალდებულოა.", "error")
+        return redirect(url_for("admin_page"))
+    try:
+        order_index = int(order_index)
+    except (ValueError, TypeError):
+        order_index = 1
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute("SELECT id FROM videos WHERE id = ?", (video_id,))
+    if not cur.fetchone():
+        conn.close()
+        flash("ვიდეო ვერ მოიძებნა.", "error")
+        return redirect(url_for("admin_page"))
+
+    cur.execute(
+        """
+        UPDATE videos
+        SET pack_id = ?, title = ?, description = ?, order_index = ?
+        WHERE id = ?
+        """,
+        (pack_id, title, description, order_index, video_id),
+    )
+    conn.commit()
+    conn.close()
+    flash("ვიდეო განახლდა.", "success")
+    return redirect(url_for("admin_page"))
 
 
 @app.route("/admin/delete_video/<int:video_id>", methods=["POST"])
