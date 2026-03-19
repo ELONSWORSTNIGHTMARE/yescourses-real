@@ -318,19 +318,43 @@ def get_user_purchased_pack_ids(user_id):
     return ids
 
 
-@app.route("/admin.html")
-@app.route("/admin_login.html")
-def redirect_old_admin():
-    return redirect(url_for("admin_page"))
+def serve_course_page(pack_id):
+    """Render course.html with video payload (requires login)."""
+    if pack_id not in PACKS:
+        flash("ასეთი პაკეტი არ არსებობს.", "error")
+        return redirect(url_for("index"))
+
+    user = get_current_user()
+    if not user:
+        flash("კურსზე წვდომისთვის საჭიროა ავტორიზაცია.", "error")
+        return redirect(url_for("index"))
+
+    conn = get_db()
+    cur = conn.cursor()
+    cur.execute(
+        "SELECT * FROM videos WHERE pack_id = ? ORDER BY order_index ASC, uploaded_at ASC",
+        (pack_id,),
+    )
+    videos = cur.fetchall()
+    conn.close()
+
+    return render_course_html_response(pack_id, videos)
 
 
 @app.route("/course.html")
-def redirect_old_course():
+def course_html():
     pack_id = request.args.get("pack", "basic")
-    return course(pack_id)
+    return serve_course_page(pack_id)
+
+
+@app.route("/course/<pack_id>")
+def course_canonical_redirect(pack_id):
+    """Old-style /course/basic → /course.html?pack=basic (visible .html URL)."""
+    return redirect(url_for("course_html", pack=pack_id), code=301)
 
 
 @app.route("/")
+@app.route("/index.html")
 def index():
     user = get_current_user()
     purchased = get_user_purchased_pack_ids(user["id"] if user else None)
@@ -424,7 +448,7 @@ def buy_pack(pack_id):
 
     if user_has_pack(user["id"], pack_id):
         flash("ეს პაკეტი უკვე გაქვს შეძენილი.", "info")
-        return redirect(url_for("course", pack_id=pack_id))
+        return redirect(url_for("course_html", pack=pack_id))
 
     # TODO: connect real bank payment here later.
     conn = get_db()
@@ -437,34 +461,10 @@ def buy_pack(pack_id):
     conn.close()
 
     flash("გილოცავ! პაკეტი წარმატებით შეიძინე.", "success")
-    return redirect(url_for("course", pack_id=pack_id))
+    return redirect(url_for("course_html", pack=pack_id))
 
 
-@app.route("/course/<pack_id>")
-def course(pack_id):
-    if pack_id not in PACKS:
-        flash("ასეთი პაკეტი არ არსებობს.", "error")
-        return redirect(url_for("index"))
-
-    user = get_current_user()
-    if not user:
-        flash("კურსზე წვდომისთვის საჭიროა ავტორიზაცია.", "error")
-        return redirect(url_for("index"))
-
-    conn = get_db()
-    cur = conn.cursor()
-    cur.execute(
-        "SELECT * FROM videos WHERE pack_id = ? ORDER BY order_index ASC, uploaded_at ASC",
-        (pack_id,),
-    )
-    videos = cur.fetchall()
-    conn.close()
-
-    return render_course_html_response(pack_id, videos)
-
-
-@app.route("/course/<pack_id>/upload", methods=["POST"])
-def course_upload_video(pack_id):
+def _course_upload_video_impl(pack_id):
     if pack_id not in PACKS:
         flash("ასეთი პაკეტი არ არსებობს.", "error")
         return redirect(url_for("index"))
@@ -474,7 +474,7 @@ def course_upload_video(pack_id):
         return redirect(url_for("index"))
     if not is_admin_user():
         flash("მხოლოდ ადმინს შეუძლია ვიდეოს ატვირთვა.", "error")
-        return redirect(url_for("course", pack_id=pack_id))
+        return redirect(url_for("course_html", pack=pack_id))
 
     title = request.form.get("title", "").strip()
     description = request.form.get("description", "").strip()
@@ -483,10 +483,10 @@ def course_upload_video(pack_id):
 
     if not title:
         flash("სათაური სავალდებულოა.", "error")
-        return redirect(url_for("course", pack_id=pack_id))
+        return redirect(url_for("course_html", pack=pack_id))
     if not file or not getattr(file, "filename", None) or not (file.filename or "").strip():
         flash("გთხოვ აირჩიო ვიდეო ფაილი.", "error")
-        return redirect(url_for("course", pack_id=pack_id))
+        return redirect(url_for("course_html", pack=pack_id))
 
     try:
         order_index = int(order_index)
@@ -506,7 +506,7 @@ def course_upload_video(pack_id):
         file.save(save_path)
     except Exception:
         flash("ვიდეოს შენახვა ვერ მოხერხდა.", "error")
-        return redirect(url_for("course", pack_id=pack_id))
+        return redirect(url_for("course_html", pack=pack_id))
 
     try:
         conn = get_db()
@@ -527,10 +527,22 @@ def course_upload_video(pack_id):
             except OSError:
                 pass
         flash("ბაზაში ჩაწერა ვერ მოხერხდა.", "error")
-        return redirect(url_for("course", pack_id=pack_id))
+        return redirect(url_for("course_html", pack=pack_id))
 
     flash("ვიდეო წარმატებით აიტვირთა.", "success")
-    return redirect(url_for("course", pack_id=pack_id))
+    return redirect(url_for("course_html", pack=pack_id))
+
+
+@app.route("/course_upload.html", methods=["POST"])
+def course_upload_video_html():
+    """Same as legacy path but URL stays in the .html style namespace."""
+    pack_id = (request.form.get("pack_id") or "basic").strip()
+    return _course_upload_video_impl(pack_id)
+
+
+@app.route("/course/<pack_id>/upload", methods=["POST"])
+def course_upload_video(pack_id):
+    return _course_upload_video_impl(pack_id)
 
 
 def is_admin_user():
@@ -562,6 +574,8 @@ def get_admin_data():
 
 
 @app.route("/admin", methods=["GET", "POST"])
+@app.route("/admin.html", methods=["GET", "POST"])
+@app.route("/admin_login.html", methods=["GET", "POST"])
 def admin_page():
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -569,10 +583,10 @@ def admin_page():
 
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session["is_admin"] = True
-            return redirect(url_for("admin_page"))
+            return redirect("/admin.html")
 
         flash("არასწორი მომხმარებელი ან პაროლი.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     if is_admin_user():
         data = get_admin_data()
@@ -589,28 +603,24 @@ def admin_page():
 @app.errorhandler(RequestEntityTooLarge)
 def handle_large_upload(e):
     flash("ვიდეო ძალიან დიდია. მაქსიმუმ 500 MB.", "error")
-    return redirect(url_for("admin_page"))
+    return redirect("/admin.html")
 
 
 @app.route("/upload_video.html")
 def upload_video_page():
     if not is_admin_user():
         flash("ადმინისტრატორის შესვლა საჭიროა (საიტზე შესვლა ან ადმინ პანელი).", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
     return render_template("upload_video.html", packs=PACKS)
 
 
-@app.route("/admin/upload_video.html")
-def admin_upload_video_redirect():
-    return redirect(url_for("upload_video_page"))
-
-
 @app.route("/admin/upload_video", methods=["GET", "POST"])
+@app.route("/admin/upload_video.html", methods=["GET", "POST"])
 def admin_upload_video():
     if request.method == "GET":
-        return redirect(url_for("admin_page"))
+        return redirect("/upload_video.html")
     if not require_admin():
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     pack_id = request.form.get("pack_id")
     title = request.form.get("title", "").strip()
@@ -620,15 +630,15 @@ def admin_upload_video():
 
     if pack_id not in PACKS:
         flash("არასწორი პაკეტი.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     if not title:
         flash("სათაური სავალდებულოა.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     if not file or not getattr(file, "filename", None) or not (file.filename or "").strip():
         flash("გთხოვ აირჩიო ვიდეო ფაილი.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     try:
         order_index = int(order_index)
@@ -648,7 +658,7 @@ def admin_upload_video():
         file.save(save_path)
     except Exception as e:
         flash("ვიდეოს შენახვა ვერ მოხერხდა.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     try:
         conn = get_db()
@@ -669,16 +679,16 @@ def admin_upload_video():
             except OSError:
                 pass
         flash("ბაზაში ჩაწერა ვერ მოხერხდა.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     flash("ვიდეო წარმატებით აიტვირთა.", "success")
-    return redirect(url_for("course", pack_id=pack_id))
+    return redirect(url_for("course_html", pack=pack_id))
 
 
 @app.route("/admin/update_video/<int:video_id>", methods=["POST"])
 def admin_update_video(video_id):
     if not require_admin():
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     pack_id = request.form.get("pack_id", "").strip()
     title = request.form.get("title", "").strip()
@@ -687,10 +697,10 @@ def admin_update_video(video_id):
 
     if pack_id not in PACKS:
         flash("არასწორი პაკეტი.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
     if not title:
         flash("სათაური სავალდებულოა.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
     try:
         order_index = int(order_index)
     except (ValueError, TypeError):
@@ -702,7 +712,7 @@ def admin_update_video(video_id):
     if not cur.fetchone():
         conn.close()
         flash("ვიდეო ვერ მოიძებნა.", "error")
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     cur.execute(
         """
@@ -715,13 +725,13 @@ def admin_update_video(video_id):
     conn.commit()
     conn.close()
     flash("ვიდეო განახლდა.", "success")
-    return redirect(url_for("admin_page"))
+    return redirect("/admin.html")
 
 
 @app.route("/admin/delete_video/<int:video_id>", methods=["POST"])
 def admin_delete_video(video_id):
     if not require_admin():
-        return redirect(url_for("admin_page"))
+        return redirect("/admin.html")
 
     conn = get_db()
     cur = conn.cursor()
@@ -736,13 +746,13 @@ def admin_delete_video(video_id):
     conn.close()
 
     flash("ვიდეო წაიშალა.", "info")
-    return redirect(url_for("admin_page"))
+    return redirect("/admin.html")
 
 
 @app.route("/admin/logout")
 def admin_logout():
     session.pop("is_admin", None)
-    return redirect(url_for("admin_page"))
+    return redirect("/admin.html")
 
 
 @app.route("/uploads/<path:filename>")

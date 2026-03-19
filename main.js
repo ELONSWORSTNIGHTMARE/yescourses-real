@@ -500,7 +500,8 @@
                 }
 
                 if (userHasPack(current, pack)) {
-                    window.location.href = "/course/" + encodeURIComponent(pack);
+                    window.location.href =
+                        "/course.html?pack=" + encodeURIComponent(pack);
                     return;
                 }
 
@@ -508,7 +509,8 @@
                 if (!ok) return;
                 purchasePack(pack);
                 initPricingActions();
-                window.location.href = "/course/" + encodeURIComponent(pack);
+                window.location.href =
+                    "/course.html?pack=" + encodeURIComponent(pack);
             });
         });
     }
@@ -556,7 +558,10 @@
 
         var params = new URLSearchParams(window.location.search);
         var pathMatch = window.location.pathname.match(/\/course\/([^/]+)\/?$/);
-        var pack = pathMatch ? decodeURIComponent(pathMatch[1]) : params.get("pack") || "basic";
+        var pack =
+            params.get("pack") ||
+            (pathMatch ? decodeURIComponent(pathMatch[1]) : null) ||
+            "basic";
         var account = getCurrentAccount();
         if (!account) {
             window.location.href = "/";
