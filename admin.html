@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="styles.css">
 </head>
-<body>
+<body data-server-admin="{{ '1' if show_dashboard else '0' }}">
 <div class="background"><div id="circles-container"></div></div>
 
-<div id="admin-login-view" class="admin-gate">
+<div id="admin-login-view" class="admin-gate"{% if show_dashboard %} style="display:none;"{% endif %}>
     <header class="main-header" style="position: relative;">
         <div class="logo">yescourses</div>
         <nav class="main-nav"><a href="/">მთავარი</a></nav>
@@ -19,7 +19,7 @@
         <p class="section-subtitle">მხოლოდ შიდა გუნდისთვის.</p>
         <div id="admin-auth-message" class="auth-message" style="max-width:24rem;margin:0 auto 1rem;display:none;"></div>
         <div class="centered-card">
-            <form class="auth-form" id="admin-login-form">
+            <form class="auth-form" id="admin-login-form" method="post" action="/admin">
                 <label>მომხმარებელი
                     <input type="text" name="username" required autocomplete="username">
                 </label>
@@ -32,7 +32,7 @@
     </section>
 </div>
 
-<div id="admin-dashboard-view" style="display:none;">
+<div id="admin-dashboard-view"{% if not show_dashboard %} style="display:none;"{% endif %}>
     <header class="main-header">
         <div class="logo">yescourses</div>
         <nav class="main-nav">
@@ -60,7 +60,7 @@
                 <div class="admin-card">
                     <h3>ვიდეოს ატვირთვა</h3>
                     <p style="margin-bottom:1rem;color:#9ca3af;">გადადით ატვირთვის გვერდზე და დაამატეთ ახალი ვიდეო.</p>
-                    <a href="/admin/upload_video.html" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
+                    <a href="/upload_video.html" class="btn-primary full-width" style="display:inline-block;text-align:center;">ვიდეოს ატვირთვა →</a>
                 </div>
             </div>
 

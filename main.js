@@ -710,7 +710,9 @@
         }
 
         function paintAdmin() {
-            var isAdmin = localStorage.getItem(STORAGE_ADMIN) === "1";
+            // Prefer server session state if available (so admin uploads work).
+            var serverAdmin = document.body && document.body.getAttribute("data-server-admin") === "1";
+            var isAdmin = serverAdmin || localStorage.getItem(STORAGE_ADMIN) === "1";
             loginView.style.display = isAdmin ? "none" : "block";
             dashView.style.display = isAdmin ? "block" : "none";
             if (isAdmin) {
@@ -721,6 +723,10 @@
 
         if (loginForm) {
             loginForm.addEventListener("submit", function (e) {
+                // If admin form is configured to submit to the server, allow the default POST.
+                var action = (loginForm.getAttribute("action") || "").trim();
+                if (action) return;
+
                 e.preventDefault();
                 var data = new FormData(loginForm);
                 var username = (data.get("username") || "").toString().trim();
@@ -741,7 +747,7 @@
         if (logoutBtn) {
             logoutBtn.addEventListener("click", function () {
                 localStorage.removeItem(STORAGE_ADMIN);
-                paintAdmin();
+                window.location.href = "/admin/logout";
             });
         }
 

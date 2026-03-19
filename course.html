@@ -20,8 +20,7 @@
 
 <main>
     <section class="section course-hero">
-        <h2 class="section-title">შენი კურსის სივრცე — {{ pack.name }}</h2>
-        <p class="section-subtitle">აქ გამოჩნდება შენთვის ხელმისაწვდომი ვიდეო გაკვეთილები და მასალები.</p>
+        <h2 class="section-title">{{ pack.name }}</h2>
     </section>
 
     <section class="section">
@@ -39,7 +38,6 @@
                     <div class="video-player-wrapper">
                         <video class="video-player" controls preload="metadata">
                             <source src="{{ url_for('uploaded_file', filename=video.filename) }}">
-                            თქვენი ბრაუზერი ვიდეოს არ უჭერს მხარს.
                         </video>
                     </div>
                 </article>
@@ -47,7 +45,6 @@
             {% else %}
                 <article class="video-card">
                     <div class="video-header"><h3 class="video-title">ჯერ ვიდეოები არ არის</h3></div>
-                    <p class="video-description">ამ პაკეტის ვიდეოები მალე დაემატება.</p>
                 </article>
             {% endif %}
         </div>
@@ -55,7 +52,7 @@
 </main>
 
 <footer class="main-footer">
-    <p>© 2026 Yescourses · yestour</p>
+    <p>© 2026 Yescourses</p>
 </footer>
 
 <script src="main.js"></script>

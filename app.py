@@ -447,8 +447,8 @@ def course_upload_video(pack_id):
     return redirect(url_for("course", pack_id=pack_id))
 
 
-ADMIN_USERNAME = "admins"
-ADMIN_PASSWORD = "admins"
+ADMIN_USERNAME = "admin"
+ADMIN_PASSWORD = "yestour111"
 ADMIN_EMAIL = "matebedeladze@gmail.com"
 
 
@@ -514,12 +514,17 @@ def handle_large_upload(e):
     return redirect(url_for("admin_page"))
 
 
-@app.route("/admin/upload_video.html")
-def admin_upload_video_page():
+@app.route("/upload_video.html")
+def upload_video_page():
     if not session.get("is_admin"):
         flash("ადმინისტრატორის შესვლა საჭიროა.", "error")
         return redirect(url_for("admin_page"))
     return render_template("upload_video.html", packs=PACKS)
+
+
+@app.route("/admin/upload_video.html")
+def admin_upload_video_redirect():
+    return redirect(url_for("upload_video_page"))
 
 
 @app.route("/admin/upload_video", methods=["GET", "POST"])
