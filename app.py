@@ -16,20 +16,21 @@ from flask import (
 from werkzeug.security import generate_password_hash, check_password_hash, safe_join
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
+import hashlib
 import json
 import os
-import sqlite3
 from datetime import datetime
+
+from db_helpers import ex, get_db, init_db as db_init_schema, is_unique_violation, row_to_dict, USE_POSTGRES
+from storage_helpers import upload_video_to_blob
 
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
-# On Vercel, filesystem is read-only except /tmp
+# On Vercel, filesystem is read-only except /tmp (not shared across instances — use DATABASE_URL + Blob)
 IS_VERCEL = os.environ.get("VERCEL") == "1"
 if IS_VERCEL:
-    DB_PATH = "/tmp/yescourses_data.db"
     UPLOAD_FOLDER = "/tmp/yescourses_uploads"
 else:
-    DB_PATH = os.path.join(BASE_DIR, "data.db")
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
@@ -156,6 +157,18 @@ PACKS = {
 }
 
 
+def video_play_src(row):
+    """Public HTTPS URL if set, else same-origin /uploads/…"""
+    r = row_to_dict(row)
+    url = (r.get("remote_src") or "").strip()
+    if url.startswith("http://") or url.startswith("https://"):
+        return url
+    fn = (r.get("filename") or "").strip()
+    if not fn:
+        return ""
+    return url_for("uploaded_file", filename=fn)
+
+
 def render_course_html_response(pack_id, videos_rows):
     """Serve course.html with embedded JSON (no Jinja in file — avoids raw {{ }} on static hosts)."""
     payload = {
@@ -165,7 +178,7 @@ def render_course_html_response(pack_id, videos_rows):
             {
                 "title": row["title"],
                 "description": (row["description"] or ""),
-                "src": url_for("uploaded_file", filename=row["filename"]),
+                "src": video_play_src(row),
             }
             for row in videos_rows
         ],
@@ -185,17 +198,21 @@ def render_course_html_response(pack_id, videos_rows):
 
 
 def admin_videos_to_json(videos_rows):
-    return [
-        {
-            "id": int(row["id"]),
-            "title": row["title"],
-            "description": row["description"] or "",
-            "pack_id": row["pack_id"],
-            "order_index": int(row["order_index"] or 1),
-            "filename": row["filename"],
-        }
-        for row in videos_rows
-    ]
+    out = []
+    for row in videos_rows:
+        r = row_to_dict(row)
+        out.append(
+            {
+                "id": int(r["id"]),
+                "title": r["title"],
+                "description": r["description"] or "",
+                "pack_id": r["pack_id"],
+                "order_index": int(r["order_index"] or 1),
+                "filename": r["filename"],
+                "remote_src": (r.get("remote_src") or ""),
+            }
+        )
+    return out
 
 
 def build_admin_payload(show_dashboard, stats, videos_json_list):
@@ -226,60 +243,13 @@ def render_admin_html_response(payload_dict):
     return Response(html, mimetype="text/html; charset=utf-8")
 
 
-def get_db():
-    conn = sqlite3.connect(DB_PATH)
-    conn.row_factory = sqlite3.Row
-    return conn
-
-
-def init_db():
+def ensure_admin_user():
     conn = get_db()
     cur = conn.cursor()
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            name TEXT NOT NULL,
-            password_hash TEXT NOT NULL,
-            created_at TEXT NOT NULL
-        )
-        """
-    )
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS purchases (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            user_id INTEGER NOT NULL,
-            pack_id TEXT NOT NULL,
-            purchased_at TEXT NOT NULL,
-            FOREIGN KEY (user_id) REFERENCES users(id)
-        )
-        """
-    )
-
-    cur.execute(
-        """
-        CREATE TABLE IF NOT EXISTS videos (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            pack_id TEXT NOT NULL,
-            title TEXT NOT NULL,
-            description TEXT,
-            filename TEXT NOT NULL,
-            order_index INTEGER NOT NULL DEFAULT 1,
-            uploaded_at TEXT NOT NULL
-        )
-        """
-    )
-
-    conn.commit()
-
-    # Ensure admin user can always log in (ADMIN_EMAIL / Matebedeladze1)
-    cur.execute("SELECT id FROM users WHERE email = ?", (ADMIN_EMAIL,))
+    ex(cur, "SELECT id FROM users WHERE email = ?", (ADMIN_EMAIL,))
     if cur.fetchone() is None:
-        cur.execute(
+        ex(
+            cur,
             """
             INSERT INTO users (email, name, password_hash, created_at)
             VALUES (?, ?, ?, ?)
@@ -292,8 +262,12 @@ def init_db():
             ),
         )
         conn.commit()
-
     conn.close()
+
+
+def init_db():
+    db_init_schema()
+    ensure_admin_user()
 
 
 def get_current_user():
@@ -302,7 +276,7 @@ def get_current_user():
         return None
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE id = ?", (user_id,))
+    ex(cur, "SELECT * FROM users WHERE id = ?", (user_id,))
     user = cur.fetchone()
     conn.close()
     return user
@@ -311,7 +285,8 @@ def get_current_user():
 def user_has_pack(user_id, pack_id):
     conn = get_db()
     cur = conn.cursor()
-    cur.execute(
+    ex(
+        cur,
         "SELECT 1 FROM purchases WHERE user_id = ? AND pack_id = ?",
         (user_id, pack_id),
     )
@@ -325,7 +300,7 @@ def get_user_purchased_pack_ids(user_id):
         return set()
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT pack_id FROM purchases WHERE user_id = ?", (user_id,))
+    ex(cur, "SELECT pack_id FROM purchases WHERE user_id = ?", (user_id,))
     ids = {row["pack_id"] for row in cur.fetchall()}
     conn.close()
     return ids
@@ -344,7 +319,8 @@ def serve_course_page(pack_id):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute(
+    ex(
+        cur,
         "SELECT * FROM videos WHERE pack_id = ? ORDER BY order_index ASC, uploaded_at ASC",
         (pack_id,),
     )
@@ -388,26 +364,49 @@ def register():
 
     conn = get_db()
     cur = conn.cursor()
+    uid = None
     try:
-        cur.execute(
-            "INSERT INTO users (email, name, password_hash, created_at) VALUES (?, ?, ?, ?)",
-            (
-                email,
-                name,
-                generate_password_hash(password),
-                datetime.utcnow().isoformat(),
-            ),
-        )
+        if USE_POSTGRES:
+            ex(
+                cur,
+                """
+                INSERT INTO users (email, name, password_hash, created_at)
+                VALUES (?, ?, ?, ?) RETURNING id
+                """,
+                (
+                    email,
+                    name,
+                    generate_password_hash(password),
+                    datetime.utcnow().isoformat(),
+                ),
+            )
+            uid = cur.fetchone()["id"]
+        else:
+            ex(
+                cur,
+                """
+                INSERT INTO users (email, name, password_hash, created_at)
+                VALUES (?, ?, ?, ?)
+                """,
+                (
+                    email,
+                    name,
+                    generate_password_hash(password),
+                    datetime.utcnow().isoformat(),
+                ),
+            )
+            uid = cur.lastrowid
         conn.commit()
-    except sqlite3.IntegrityError:
+    except Exception as e:
+        if is_unique_violation(e):
+            conn.close()
+            flash("ამ ელფოსტით მომხმარებელი უკვე არსებობს.", "error")
+            return redirect(request.referrer or url_for("index"))
         conn.close()
-        flash("ამ ელფოსტით მომხმარებელი უკვე არსებობს.", "error")
-        return redirect(request.referrer or url_for("index"))
-
-    cur.execute("SELECT id FROM users WHERE email = ?", (email,))
-    user = cur.fetchone()
+        raise
     conn.close()
-    session["user_id"] = user["id"]
+
+    session["user_id"] = uid
     if email.lower() == ADMIN_EMAIL.lower():
         session["is_admin"] = True
     flash("რეგისტრაცია წარმატებით დასრულდა!", "success")
@@ -421,7 +420,7 @@ def login():
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT * FROM users WHERE email = ?", (email,))
+    ex(cur, "SELECT * FROM users WHERE email = ?", (email,))
     user = cur.fetchone()
     conn.close()
 
@@ -466,7 +465,8 @@ def buy_pack(pack_id):
     # TODO: connect real bank payment here later.
     conn = get_db()
     cur = conn.cursor()
-    cur.execute(
+    ex(
+        cur,
         "INSERT INTO purchases (user_id, pack_id, purchased_at) VALUES (?, ?, ?)",
         (user["id"], pack_id, datetime.utcnow().isoformat()),
     )
@@ -475,6 +475,113 @@ def buy_pack(pack_id):
 
     flash("გილოცავ! პაკეტი წარმატებით შეიძინე.", "success")
     return redirect(url_for("course_html", pack=pack_id))
+
+
+def insert_video_from_filestorage(pack_id, title, description, order_index, file_storage):
+    """
+    Upload to Vercel Blob when BLOB_READ_WRITE_TOKEN is set; otherwise save under UPLOAD_FOLDER.
+    Returns None on success, or Georgian error message string.
+    """
+    base_name = secure_filename(file_storage.filename or "")
+    if not base_name:
+        base_name = "video"
+    name, ext = os.path.splitext(base_name)
+    ext_lower = ext.lower()
+    if not ext_lower or ext_lower not in (".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v"):
+        ext = ".mp4"
+        ext_lower = ".mp4"
+    filename = f"{name}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext}"
+
+    try:
+        raw = file_storage.read()
+    except OSError:
+        return "ვიდეოს წაკითხვა ვერ მოხერხდა."
+
+    if not raw:
+        return "გთხოვ აირჩიო ვიდეო ფაილი."
+
+    content_type = _VIDEO_MIME.get(ext_lower) or "application/octet-stream"
+    remote_src = upload_video_to_blob(filename, raw, content_type)
+
+    save_path = None
+    if not remote_src:
+        save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
+        try:
+            with open(save_path, "wb") as f:
+                f.write(raw)
+        except OSError:
+            return "ვიდეოს შენახვა ვერ მოხერხდა."
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        ex(
+            cur,
+            """
+            INSERT INTO videos (pack_id, title, description, filename, order_index, uploaded_at, remote_src)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pack_id,
+                title,
+                description,
+                filename,
+                order_index,
+                datetime.utcnow().isoformat(),
+                remote_src,
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        if save_path and os.path.isfile(save_path):
+            try:
+                os.remove(save_path)
+            except OSError:
+                pass
+        return "ბაზაში ჩაწერა ვერ მოხერხდა."
+
+    if IS_VERCEL and not remote_src:
+        flash(
+            "შენიშვნა: ფაილი ინახება მხოლოდ ამ სერვერის დროებით დისკზე — სხვა მომხმარებლებს ხშირად ვერ ჩანს. "
+            "Vercel-ზე გამოიყენე „საჯარო ბმული“ (ქვემოთ) ან დაამატე DATABASE_URL (Postgres).",
+            "warning",
+        )
+    return None
+
+
+def insert_remote_video_row(pack_id, title, description, order_index, video_url: str):
+    """Store a public HTTPS video URL so every user/device sees the same stream (works on Vercel)."""
+    video_url = (video_url or "").strip()
+    if not video_url.startswith("http://") and not video_url.startswith("https://"):
+        return "დაუშვებელი ბმული (საჭიროა https:// ან http://)."
+
+    fn = "remote_" + hashlib.sha256(video_url.encode("utf-8")).hexdigest()[:24] + ".mp4"
+
+    try:
+        conn = get_db()
+        cur = conn.cursor()
+        ex(
+            cur,
+            """
+            INSERT INTO videos (pack_id, title, description, filename, order_index, uploaded_at, remote_src)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            """,
+            (
+                pack_id,
+                title,
+                description,
+                fn,
+                order_index,
+                datetime.utcnow().isoformat(),
+                video_url,
+            ),
+        )
+        conn.commit()
+        conn.close()
+    except Exception:
+        return "ბაზაში ჩაწერა ვერ მოხერხდა."
+    return None
 
 
 def _course_upload_video_impl(pack_id):
@@ -506,40 +613,9 @@ def _course_upload_video_impl(pack_id):
     except (ValueError, TypeError):
         order_index = 1
 
-    base_name = secure_filename(file.filename)
-    if not base_name:
-        base_name = "video"
-    name, ext = os.path.splitext(base_name)
-    if not ext or ext.lower() not in (".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v"):
-        ext = ".mp4"
-    filename = f"{name}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext}"
-
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    try:
-        file.save(save_path)
-    except Exception:
-        flash("ვიდეოს შენახვა ვერ მოხერხდა.", "error")
-        return redirect(url_for("course_html", pack=pack_id))
-
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO videos (pack_id, title, description, filename, order_index, uploaded_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (pack_id, title, description, filename, order_index, datetime.utcnow().isoformat()),
-        )
-        conn.commit()
-        conn.close()
-    except Exception:
-        if os.path.exists(save_path):
-            try:
-                os.remove(save_path)
-            except OSError:
-                pass
-        flash("ბაზაში ჩაწერა ვერ მოხერხდა.", "error")
+    err = insert_video_from_filestorage(pack_id, title, description, order_index, file)
+    if err:
+        flash(err, "error")
         return redirect(url_for("course_html", pack=pack_id))
 
     flash("ვიდეო წარმატებით აიტვირთა.", "success")
@@ -575,11 +651,12 @@ def get_admin_data():
     cur = conn.cursor()
     stats = {}
     for pid in PACKS.keys():
-        cur.execute("SELECT COUNT(*) AS c FROM purchases WHERE pack_id = ?", (pid,))
+        ex(cur, "SELECT COUNT(*) AS c FROM purchases WHERE pack_id = ?", (pid,))
         row = cur.fetchone()
         stats[pid] = row["c"] if row else 0
-    cur.execute(
-        "SELECT * FROM videos ORDER BY pack_id ASC, order_index ASC, uploaded_at ASC"
+    ex(
+        cur,
+        "SELECT * FROM videos ORDER BY pack_id ASC, order_index ASC, uploaded_at ASC",
     )
     videos = cur.fetchall()
     conn.close()
@@ -639,6 +716,7 @@ def admin_upload_video():
     title = request.form.get("title", "").strip()
     description = request.form.get("description", "").strip()
     order_index = request.form.get("order_index", "1")
+    video_url = request.form.get("video_url", "").strip()
     file = request.files.get("video_file")
 
     if pack_id not in PACKS:
@@ -649,49 +727,28 @@ def admin_upload_video():
         flash("სათაური სავალდებულოა.", "error")
         return redirect("/admin.html")
 
-    if not file or not getattr(file, "filename", None) or not (file.filename or "").strip():
-        flash("გთხოვ აირჩიო ვიდეო ფაილი.", "error")
-        return redirect("/admin.html")
-
     try:
         order_index = int(order_index)
     except (ValueError, TypeError):
         order_index = 1
 
-    base_name = secure_filename(file.filename)
-    if not base_name:
-        base_name = "video"
-    name, ext = os.path.splitext(base_name)
-    if not ext or ext.lower() not in (".mp4", ".webm", ".mov", ".avi", ".mkv", ".m4v"):
-        ext = ".mp4"
-    filename = f"{name}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}{ext}"
+    if video_url:
+        err = insert_remote_video_row(
+            pack_id, title, description, order_index, video_url
+        )
+        if err:
+            flash(err, "error")
+            return redirect("/admin.html")
+        flash("ვიდეოს ბმული შენახულია — ყველა მომხმარებელს ერთნაირად უნდა ჩანდეს.", "success")
+        return redirect(url_for("course_html", pack=pack_id))
 
-    save_path = os.path.join(app.config["UPLOAD_FOLDER"], filename)
-    try:
-        file.save(save_path)
-    except Exception as e:
-        flash("ვიდეოს შენახვა ვერ მოხერხდა.", "error")
+    if not file or not getattr(file, "filename", None) or not (file.filename or "").strip():
+        flash("ჩასვი საჯარო ვიდეოს ბმული (https) ან აირჩიე ფაილი.", "error")
         return redirect("/admin.html")
 
-    try:
-        conn = get_db()
-        cur = conn.cursor()
-        cur.execute(
-            """
-            INSERT INTO videos (pack_id, title, description, filename, order_index, uploaded_at)
-            VALUES (?, ?, ?, ?, ?, ?)
-            """,
-            (pack_id, title, description, filename, order_index, datetime.utcnow().isoformat()),
-        )
-        conn.commit()
-        conn.close()
-    except Exception:
-        if os.path.exists(save_path):
-            try:
-                os.remove(save_path)
-            except OSError:
-                pass
-        flash("ბაზაში ჩაწერა ვერ მოხერხდა.", "error")
+    err = insert_video_from_filestorage(pack_id, title, description, order_index, file)
+    if err:
+        flash(err, "error")
         return redirect("/admin.html")
 
     flash("ვიდეო წარმატებით აიტვირთა.", "success")
@@ -721,13 +778,14 @@ def admin_update_video(video_id):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT id FROM videos WHERE id = ?", (video_id,))
+    ex(cur, "SELECT id FROM videos WHERE id = ?", (video_id,))
     if not cur.fetchone():
         conn.close()
         flash("ვიდეო ვერ მოიძებნა.", "error")
         return redirect("/admin.html")
 
-    cur.execute(
+    ex(
+        cur,
         """
         UPDATE videos
         SET pack_id = ?, title = ?, description = ?, order_index = ?
@@ -748,13 +806,18 @@ def admin_delete_video(video_id):
 
     conn = get_db()
     cur = conn.cursor()
-    cur.execute("SELECT filename FROM videos WHERE id = ?", (video_id,))
+    ex(cur, "SELECT filename, remote_src FROM videos WHERE id = ?", (video_id,))
     video = cur.fetchone()
     if video:
-        filepath = os.path.join(app.config["UPLOAD_FOLDER"], video["filename"])
-        if os.path.exists(filepath):
-            os.remove(filepath)
-        cur.execute("DELETE FROM videos WHERE id = ?", (video_id,))
+        r = row_to_dict(video)
+        remote = (r.get("remote_src") or "").strip()
+        if not remote:
+            filepath = os.path.join(
+                app.config["UPLOAD_FOLDER"], r.get("filename") or ""
+            )
+            if os.path.exists(filepath):
+                os.remove(filepath)
+        ex(cur, "DELETE FROM videos WHERE id = ?", (video_id,))
         conn.commit()
     conn.close()
 
@@ -795,6 +858,12 @@ def uploaded_file(filename):
 
 # Ensure DB exists when app is loaded (e.g. on Vercel serverless)
 init_db()
+
+if IS_VERCEL and not USE_POSTGRES:
+    app.logger.warning(
+        "Vercel: SQLite lives in /tmp per instance — other users often see empty courses. "
+        "Set DATABASE_URL (e.g. Supabase Postgres URI from Project Settings → Database)."
+    )
 
 if __name__ == "__main__":
     app.run(debug=True)
