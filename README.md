@@ -9,7 +9,7 @@ Single Flask app: landing, course pages, and admin. One codebase for local and V
   - Old URL `/course/basic` **301 redirects** to `/course.html?pack=basic` so the address bar shows `.html`.
 - **Admin** (`/admin.html`, also `/admin` and `/admin_login.html`): login then dashboard (stats, video upload, list/delete)
   - Credentials: **admin** / **yestour111**
-- **Upload** (`/upload_video.html`): form **POSTs to the same URL** (handled by Flask). HTML templates live in `templates/` so Vercel does **not** serve a stale root `upload_video.html` from the CDN (that used to POST to `/admin/upload_video.html` and break).
+- **Upload** (`GET /upload_video.html`, **`POST /submit_video_upload`**): page HTML must live in `templates/` only (no root `*.html` for these pages) so Vercel does not serve them as static files. **POST to a `.html` URL often returns HTTP 405** on static/CDN layers.
 
 ### Running locally
 

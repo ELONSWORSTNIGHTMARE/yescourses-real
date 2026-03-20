@@ -820,10 +820,14 @@ def handle_admin_video_upload_form():
     return redirect(url_for("course_html", pack=pack_id))
 
 
-@app.route("/upload_video.html", methods=["GET", "POST"])
+@app.route("/submit_video_upload", methods=["POST"])
+def submit_video_upload():
+    """POST-only: never use a *.html URL here — Vercel/static may return 405 for POST to static files."""
+    return handle_admin_video_upload_form()
+
+
+@app.route("/upload_video.html", methods=["GET"])
 def upload_video_page():
-    if request.method == "POST":
-        return handle_admin_video_upload_form()
     if not is_admin_user():
         flash("ადმინისტრატორის შესვლა საჭიროა (საიტზე შესვლა ან ადმინ პანელი).", "error")
         return redirect("/admin.html")
