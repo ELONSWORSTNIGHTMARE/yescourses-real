@@ -18,6 +18,7 @@ def _resolve_database_url() -> str:
         "SUPABASE_DATABASE_URL",
         "POSTGRES_URL",
         "POSTGRES_URL_NON_POOLING",
+        "POSTGRES_PRISMA_URL",
     ):
         v = os.environ.get(key, "").strip()
         if v:

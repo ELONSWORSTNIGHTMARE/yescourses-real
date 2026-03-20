@@ -526,6 +526,13 @@
 
     /** iOS Safari: playsinline + &lt;source type&gt;; server must send Range + correct Content-Type */
     function courseVideoPlayerHtml(src) {
+        if (!src || !String(src).trim()) {
+            return (
+                '<div class="video-player-wrapper" style="padding:1rem;border-radius:0.8rem;border:1px solid rgba(248,113,113,0.5);background:rgba(127,29,29,0.2);">' +
+                '<p class="video-description" style="margin:0;color:#fca5a5;">ვიდეოს წყარო აკლია ან ხელმიუწვდომელია ამ მოწყობილობიდან. ადმინმა უნდა დაამატოს <strong>საჯარო HTTPS ბმული</strong> (MP4) ატვირთვის გვერდზე.</p>' +
+                "</div>"
+            );
+        }
         var esc = escapeHtml(src);
         var mime = videoMimeFromUrl(src);
         return (
@@ -545,6 +552,22 @@
     function renderCourseVideosFromServer(list, payload) {
         var title = document.getElementById("course-title");
         if (title) title.textContent = payload.pack_name || "კურსი";
+        var warnBox = document.getElementById("course-warnings");
+        if (warnBox) {
+            var warns = payload.warnings || [];
+            if (warns.length) {
+                warnBox.style.display = "block";
+                warnBox.innerHTML =
+                    '<div class="auth-message error" style="max-width:100%;margin:0 0 1rem;padding:0.75rem 1rem;border-radius:0.75rem;">' +
+                    warns.map(function (w) {
+                        return "<p style=\"margin:0.35rem 0;\">" + escapeHtml(w) + "</p>";
+                    }).join("") +
+                    "</div>";
+            } else {
+                warnBox.innerHTML = "";
+                warnBox.style.display = "none";
+            }
+        }
         var videos = payload.videos || [];
         if (!videos.length) {
             list.innerHTML =
@@ -786,6 +809,37 @@
                         );
                     })
                     .join("");
+            }
+            var diagBar = document.getElementById("admin-diag-banner");
+            if (diagBar && serverPayload.showDashboard && serverPayload.diag) {
+                var d = serverPayload.diag;
+                var sub =
+                    "DB: " +
+                    (d.database || "?") +
+                    " · Vercel: " +
+                    (d.vercel ? "yes" : "no") +
+                    " · შეამოწმე /healthz სხვა ტელეფონიდან";
+                if (d.alert) {
+                    diagBar.style.display = "block";
+                    diagBar.innerHTML =
+                        '<div class="auth-message error" style="padding:0.75rem 1rem;border-radius:0.75rem;">' +
+                        "<strong>ყურადღება</strong>" +
+                        '<p style="margin:0.35rem 0 0;font-size:0.9rem;">' +
+                        escapeHtml(d.alert) +
+                        "</p>" +
+                        '<p style="margin:0.45rem 0 0;font-size:0.78rem;color:#9ca3af;">' +
+                        escapeHtml(sub) +
+                        "</p></div>";
+                } else {
+                    diagBar.style.display = "block";
+                    diagBar.innerHTML =
+                        '<div style="padding:0.5rem 0.85rem;border-radius:0.75rem;background:rgba(34,197,94,0.1);border:1px solid rgba(34,197,94,0.35);font-size:0.82rem;color:#86efac;">' +
+                        escapeHtml(sub) +
+                        "</div>";
+                }
+            } else if (diagBar && !serverPayload.showDashboard) {
+                diagBar.style.display = "none";
+                diagBar.innerHTML = "";
             }
             if (serverPayload.showDashboard) {
                 paintServerSalesStats(serverPayload.stats);

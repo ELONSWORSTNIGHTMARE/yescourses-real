@@ -51,6 +51,8 @@ Local development unchanged: SQLite + `static/uploads/` when `DATABASE_URL` is u
 
 **If you pasted DB keys or service-role keys in chat or GitHub, rotate them in Supabase** (reset DB password, regenerate JWT secret, roll API keys).
 
+**Debug from another phone:** open `https://YOUR_DOMAIN/healthz` — if `"database":"sqlite"` on Vercel, `DATABASE_URL` is not set for the Python app. You should see `"postgres"` after fixing env + redeploy.
+
 ### Next steps for real payments
 
 - Replace the fake `/buy/<pack_id>` logic with your Georgian bank payment integration.

@@ -5,6 +5,8 @@ from flask import (
     Response,
     flash,
     get_flashed_messages,
+    jsonify,
+    make_response,
     redirect,
     render_template,
     request,
@@ -46,6 +48,9 @@ app.config["MAX_CONTENT_LENGTH"] = 500 * 1024 * 1024
 # So session cookie works after redirect (e.g. on Vercel)
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
+# Required on HTTPS (Vercel) or logins/sessions break or behave oddly across devices
+if IS_VERCEL or os.environ.get("SESSION_COOKIE_SECURE") == "1":
+    app.config["SESSION_COOKIE_SECURE"] = True
 
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
 
@@ -171,9 +176,21 @@ def video_play_src(row):
 
 def render_course_html_response(pack_id, videos_rows):
     """Serve course.html with embedded JSON (no Jinja in file — avoids raw {{ }} on static hosts)."""
+    warnings = []
+    if IS_VERCEL:
+        for row in videos_rows:
+            r = row_to_dict(row)
+            if not (r.get("remote_src") or "").strip():
+                warnings.append(
+                    "ერთი ან მეტი ვიდეო ლოკალური ფაილია — სხვა მოწყობილობაზე ხშირად არ იტვირთება. "
+                    "გამოიყენე „საჯარო ვიდეოს ბმული“ (HTTPS MP4) ატვირთვის გვერდზე."
+                )
+                break
+
     payload = {
         "pack_id": pack_id,
         "pack_name": PACKS[pack_id]["name"],
+        "warnings": warnings,
         "videos": [
             {
                 "title": row["title"],
@@ -194,7 +211,11 @@ def render_course_html_response(pack_id, videos_rows):
     if marker not in html:
         raise RuntimeError("course.html is missing __YES_COURSES_INJECT__ marker")
     html = html.replace(marker, injected, 1)
-    return Response(html, mimetype="text/html; charset=utf-8")
+    r = Response(html, mimetype="text/html; charset=utf-8")
+    # Stop CDN/browser serving another user's cached course HTML
+    r.headers["Cache-Control"] = "private, no-store, max-age=0, must-revalidate"
+    r.headers["Pragma"] = "no-cache"
+    return r
 
 
 def admin_videos_to_json(videos_rows):
@@ -217,10 +238,33 @@ def admin_videos_to_json(videos_rows):
 
 def build_admin_payload(show_dashboard, stats, videos_json_list):
     flashes = get_flashed_messages(with_categories=True)
+    vids = videos_json_list or []
+    file_only = sum(
+        1 for v in vids if not (str(v.get("remote_src") or "").strip())
+    )
+    diag = {
+        "database": "postgres" if USE_POSTGRES else "sqlite",
+        "vercel": bool(IS_VERCEL),
+        "fileOnlyVideoCount": file_only,
+    }
+    if IS_VERCEL and not USE_POSTGRES:
+        diag["alert"] = (
+            "არ გამოიყენება Postgres (DATABASE_URL). სხვა მოწყობილობაზე ბაზა ცარიელია — "
+            "დაამატე DATABASE_URL Vercel-ში და გადააწყვე."
+        )
+    elif IS_VERCEL and file_only > 0:
+        diag["alert"] = (
+            f"{file_only} ვიდეო ფაილადაა (არა HTTPS ბმული) — სხვა მოწყობილობაზე შეიძლება არ იტვირთოს. "
+            "შეცვალი ბმულით ან ხელახლა დაამატე „საჯარო ვიდეოს ბმული“."
+        )
+    else:
+        diag["alert"] = ""
+
     return {
         "showDashboard": bool(show_dashboard),
         "stats": stats or {},
-        "videos": videos_json_list or [],
+        "videos": vids,
+        "diag": diag,
         "flashes": [
             {"category": str(cat or "message"), "message": str(msg or "")}
             for cat, msg in flashes
@@ -240,7 +284,10 @@ def render_admin_html_response(payload_dict):
     if marker not in html:
         raise RuntimeError("admin.html is missing __ADMIN_INJECT__ marker")
     html = html.replace(marker, injected, 1)
-    return Response(html, mimetype="text/html; charset=utf-8")
+    r = Response(html, mimetype="text/html; charset=utf-8")
+    r.headers["Cache-Control"] = "private, no-store, max-age=0, must-revalidate"
+    r.headers["Pragma"] = "no-cache"
+    return r
 
 
 def ensure_admin_user():
@@ -347,8 +394,24 @@ def course_canonical_redirect(pack_id):
 def index():
     user = get_current_user()
     purchased = get_user_purchased_pack_ids(user["id"] if user else None)
-    return render_template(
+    html = render_template(
         "index.html", packs=PACKS, user=user, purchased_pack_ids=purchased
+    )
+    resp = make_response(html)
+    resp.headers["Cache-Control"] = "private, no-store, max-age=0, must-revalidate"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
+
+
+@app.route("/healthz")
+def healthz():
+    """Quick check from any device: is Postgres configured? (no secrets returned)"""
+    return jsonify(
+        {
+            "ok": True,
+            "database": "postgres" if USE_POSTGRES else "sqlite",
+            "vercel": bool(IS_VERCEL),
+        }
     )
 
 
