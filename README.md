@@ -9,7 +9,7 @@ Single Flask app: landing, course pages, and admin. One codebase for local and V
   - Old URL `/course/basic` **301 redirects** to `/course.html?pack=basic` so the address bar shows `.html`.
 - **Admin** (`/admin.html`, also `/admin` and `/admin_login.html`): login then dashboard (stats, video upload, list/delete)
   - Credentials: **admin** / **yestour111**
-- **Upload** (`/upload_video.html`), form POST to `/admin/upload_video.html`
+- **Upload** (`/upload_video.html`), form POST to `/admin/upload_video` (avoid `.html` on Vercel — static 404)
 
 ### Running locally
 
