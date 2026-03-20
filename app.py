@@ -36,10 +36,13 @@ else:
     UPLOAD_FOLDER = os.path.join(BASE_DIR, "static", "uploads")
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 
+# HTML lives in templates/ so Vercel does not serve stale root *.html as static CDN files
+# (which bypassed Flask and kept old form actions like POST /admin/upload_video.html).
+TEMPLATES_DIR = os.path.join(BASE_DIR, "templates")
 
 app = Flask(
     __name__,
-    template_folder=BASE_DIR,
+    template_folder=TEMPLATES_DIR,
 )
 app.config["SECRET_KEY"] = "change-this-secret-key"
 app.config["UPLOAD_FOLDER"] = UPLOAD_FOLDER
@@ -200,7 +203,7 @@ def render_course_html_response(pack_id, videos_rows):
             for row in videos_rows
         ],
     }
-    path = os.path.join(BASE_DIR, "course.html")
+    path = os.path.join(TEMPLATES_DIR, "course.html")
     with open(path, encoding="utf-8") as f:
         html = f.read()
     payload_js = json.dumps(payload, ensure_ascii=False)
@@ -274,7 +277,7 @@ def build_admin_payload(show_dashboard, stats, videos_json_list):
 
 def render_admin_html_response(payload_dict):
     """admin.html without Jinja — payload drives dashboard (same pattern as course page)."""
-    path = os.path.join(BASE_DIR, "admin.html")
+    path = os.path.join(TEMPLATES_DIR, "admin.html")
     with open(path, encoding="utf-8") as f:
         html = f.read()
     payload_js = json.dumps(payload_dict, ensure_ascii=False)
@@ -765,22 +768,11 @@ def admin_page():
 @app.errorhandler(RequestEntityTooLarge)
 def handle_large_upload(e):
     flash("ვიდეო ძალიან დიდია. მაქსიმუმ 500 MB.", "error")
-    return redirect("/admin.html")
+    return redirect("/upload_video.html")
 
 
-@app.route("/upload_video.html")
-def upload_video_page():
-    if not is_admin_user():
-        flash("ადმინისტრატორის შესვლა საჭიროა (საიტზე შესვლა ან ადმინ პანელი).", "error")
-        return redirect("/admin.html")
-    return render_template("upload_video.html", packs=PACKS)
-
-
-@app.route("/admin/upload_video", methods=["GET", "POST"])
-@app.route("/admin/upload_video.html", methods=["GET", "POST"])
-def admin_upload_video():
-    if request.method == "GET":
-        return redirect("/upload_video.html")
+def handle_admin_video_upload_form():
+    """Shared POST handler for video upload forms. On errors, stay on upload page."""
     if not require_admin():
         return redirect("/admin.html")
 
@@ -790,14 +782,15 @@ def admin_upload_video():
     order_index = request.form.get("order_index", "1")
     video_url = request.form.get("video_url", "").strip()
     file = request.files.get("video_file")
+    back = "/upload_video.html"
 
     if pack_id not in PACKS:
         flash("არასწორი პაკეტი.", "error")
-        return redirect("/admin.html")
+        return redirect(back)
 
     if not title:
         flash("სათაური სავალდებულოა.", "error")
-        return redirect("/admin.html")
+        return redirect(back)
 
     try:
         order_index = int(order_index)
@@ -810,21 +803,40 @@ def admin_upload_video():
         )
         if err:
             flash(err, "error")
-            return redirect("/admin.html")
+            return redirect(back)
         flash("ვიდეოს ბმული შენახულია — ყველა მომხმარებელს ერთნაირად უნდა ჩანდეს.", "success")
         return redirect(url_for("course_html", pack=pack_id))
 
     if not file or not getattr(file, "filename", None) or not (file.filename or "").strip():
         flash("ჩასვი საჯარო ვიდეოს ბმული (https) ან აირჩიე ფაილი.", "error")
-        return redirect("/admin.html")
+        return redirect(back)
 
     err = insert_video_from_filestorage(pack_id, title, description, order_index, file)
     if err:
         flash(err, "error")
-        return redirect("/admin.html")
+        return redirect(back)
 
     flash("ვიდეო წარმატებით აიტვირთა.", "success")
     return redirect(url_for("course_html", pack=pack_id))
+
+
+@app.route("/upload_video.html", methods=["GET", "POST"])
+def upload_video_page():
+    if request.method == "POST":
+        return handle_admin_video_upload_form()
+    if not is_admin_user():
+        flash("ადმინისტრატორის შესვლა საჭიროა (საიტზე შესვლა ან ადმინ პანელი).", "error")
+        return redirect("/admin.html")
+    return render_template("upload_video.html", packs=PACKS)
+
+
+@app.route("/admin/upload_video", methods=["GET", "POST"])
+@app.route("/admin/upload_video.html", methods=["GET", "POST"])
+def admin_upload_video():
+    """Legacy URLs: always use /upload_video.html + POST here in production."""
+    if request.method == "GET":
+        return redirect("/upload_video.html", code=301)
+    return handle_admin_video_upload_form()
 
 
 @app.route("/admin/update_video/<int:video_id>", methods=["POST"])
