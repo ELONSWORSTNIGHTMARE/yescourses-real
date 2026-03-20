@@ -515,6 +515,33 @@
         });
     }
 
+    function videoMimeFromUrl(url) {
+        var path = (url || "").split("?")[0].split("#")[0].toLowerCase();
+        if (path.endsWith(".m4v") || path.endsWith(".mp4")) return "video/mp4";
+        if (path.endsWith(".webm")) return "video/webm";
+        if (path.endsWith(".mov")) return "video/quicktime";
+        if (path.endsWith(".mkv")) return "video/x-matroska";
+        return "video/mp4";
+    }
+
+    /** iOS Safari: playsinline + &lt;source type&gt;; server must send Range + correct Content-Type */
+    function courseVideoPlayerHtml(src) {
+        var esc = escapeHtml(src);
+        var mime = videoMimeFromUrl(src);
+        return (
+            '<div class="video-player-wrapper">' +
+            '<video class="video-player" controls playsinline webkit-playsinline ' +
+            'preload="metadata" x-webkit-airplay="allow">' +
+            '<source src="' +
+            esc +
+            '" type="' +
+            mime +
+            '">' +
+            "თქვენი ბრაუზერი ვიდეოს არ იგებს." +
+            "</video></div>"
+        );
+    }
+
     function renderCourseVideosFromServer(list, payload) {
         var title = document.getElementById("course-title");
         if (title) title.textContent = payload.pack_name || "კურსი";
@@ -537,9 +564,7 @@
                     v.description
                         ? '<p class="video-description">' + escapeHtml(v.description) + "</p>"
                         : "",
-                    '<div class="video-player-wrapper"><video class="video-player" controls preload="metadata" src="' +
-                        escapeHtml(src) +
-                        '">თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>',
+                    courseVideoPlayerHtml(src),
                     "</article>",
                 ].join("");
             })
@@ -605,7 +630,15 @@
                         escapeHtml(v.blob_id || "") +
                         '" data-fallback-url="' +
                         escapeHtml(v.url || "") +
-                        '" controls preload="metadata">თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>',
+                        '" controls playsinline webkit-playsinline preload="metadata" x-webkit-airplay="allow">' +
+                        (v.url
+                            ? '<source src="' +
+                              escapeHtml(v.url) +
+                              '" type="' +
+                              videoMimeFromUrl(v.url) +
+                              '">'
+                            : "") +
+                        "თქვენი ბრაუზერი ვიდეოს არ იგებს.</video></div>",
                     "</article>",
                 ].join("");
             })

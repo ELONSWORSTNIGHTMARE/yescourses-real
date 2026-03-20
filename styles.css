@@ -800,9 +800,17 @@ main {
     margin-bottom: 0.5rem;
 }
 
+.video-player-wrapper {
+    width: 100%;
+    max-width: 100%;
+}
+
 .video-player,
 .video-player-placeholder {
     width: 100%;
+    max-width: 100%;
+    height: auto;
+    display: block;
     border-radius: 0.8rem;
     border: 1px solid rgba(31, 41, 55, 1);
     background: #0f172a;

@@ -1,3 +1,5 @@
+import mimetypes
+
 from flask import (
     Flask,
     Response,
@@ -6,11 +8,12 @@ from flask import (
     redirect,
     render_template,
     request,
+    send_file,
     send_from_directory,
     session,
     url_for,
 )
-from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.security import generate_password_hash, check_password_hash, safe_join
 from werkzeug.utils import secure_filename
 from werkzeug.exceptions import RequestEntityTooLarge
 import json
@@ -44,6 +47,16 @@ app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 app.config["SESSION_COOKIE_HTTPONLY"] = True
 
 PUBLIC_DIR = os.path.join(BASE_DIR, "public")
+
+# Mobile browsers (esp. iOS Safari) need correct MIME + Range requests; guess_type is weak for .mp4.
+_VIDEO_MIME = {
+    ".mp4": "video/mp4",
+    ".m4v": "video/mp4",
+    ".webm": "video/webm",
+    ".mov": "video/quicktime",
+    ".avi": "video/x-msvideo",
+    ".mkv": "video/x-matroska",
+}
 
 # Admin: panel login + site user that may upload / manage videos
 ADMIN_USERNAME = "admin"
@@ -757,7 +770,27 @@ def admin_logout():
 
 @app.route("/uploads/<path:filename>")
 def uploaded_file(filename):
-    return send_from_directory(app.config["UPLOAD_FOLDER"], filename)
+    """
+    Stream video with correct Content-Type, Accept-Ranges, and 206 partial responses.
+    Required for playback on many phones (especially iOS).
+    """
+    directory = app.config["UPLOAD_FOLDER"]
+    path = safe_join(directory, filename)
+    if path is None or not os.path.isfile(path):
+        return Response("Not found", status=404, mimetype="text/plain")
+
+    ext = os.path.splitext(filename)[1].lower()
+    mimetype = _VIDEO_MIME.get(ext) or mimetypes.guess_type(filename)[0]
+    if not mimetype:
+        mimetype = "application/octet-stream"
+
+    return send_file(
+        path,
+        mimetype=mimetype,
+        conditional=True,
+        max_age=3600,
+        etag=True,
+    )
 
 
 # Ensure DB exists when app is loaded (e.g. on Vercel serverless)
