@@ -354,13 +354,14 @@ def get_user_purchased_pack_ids(user_id):
 
 
 def serve_course_page(pack_id):
-    """Render course.html with video payload (requires login)."""
+    """Render course.html with video payload (requires user account or admin session)."""
     if pack_id not in PACKS:
         flash("ასეთი პაკეტი არ არსებობს.", "error")
         return redirect(url_for("index"))
 
     user = get_current_user()
-    if not user:
+    # Admin panel login only set is_admin until now — allow preview after video upload.
+    if not user and not is_admin_user():
         flash("კურსზე წვდომისთვის საჭიროა ავტორიზაცია.", "error")
         return redirect(url_for("index"))
 
@@ -736,6 +737,14 @@ def admin_page():
 
         if username == ADMIN_USERNAME and password == ADMIN_PASSWORD:
             session["is_admin"] = True
+            # So /course.html after upload works (same session as „user“ for get_current_user).
+            conn = get_db()
+            cur = conn.cursor()
+            ex(cur, "SELECT id FROM users WHERE email = ?", (ADMIN_EMAIL,))
+            admin_row = cur.fetchone()
+            conn.close()
+            if admin_row:
+                session["user_id"] = admin_row["id"]
             return redirect("/admin.html")
 
         flash("არასწორი მომხმარებელი ან პაროლი.", "error")
